@@ -1865,10 +1865,14 @@ renderSuggestions();
 renderHistory();
 render();
 
+// PWA service worker тимчасово вимкнено — заважав під час активної розробки
+// (браузер продовжував віддавати старий закешований код). Повернемо його,
+// коли основна автоматизація стабілізується.
 if('serviceWorker' in navigator){
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(reg => reg.unregister());
   });
+  caches && caches.keys && caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
 }
 </script>
 </body>
