@@ -1668,15 +1668,15 @@ async function pushTtnToProm(){
     const res = await fetch('http://localhost:8787/prom/api/v1/delivery/save_declaration_id', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + promToken },
-      body: JSON.stringify({ id: parseInt(promId), declaration_id: ttn })
+      body: JSON.stringify({ order_id: parseInt(promId), declaration_id: ttn, delivery_type: 'nova_poshta' })
     });
     const bodyText = await res.text().catch(() => '');
     let bodyJson = null;
     try{ bodyJson = JSON.parse(bodyText); }catch(e){}
-    if(res.ok && !(bodyJson && bodyJson.error)){
+    if(res.ok && bodyJson && bodyJson.status === 'success'){
       lines.push(`<span class="ok">✓ Накладна №${escapeHtml(ttn)} записана в Prom.ua</span>`);
     }else{
-      const errMsg = (bodyJson && bodyJson.error) || `HTTP ${res.status}`;
+      const errMsg = (bodyJson && (bodyJson.message || (bodyJson.errors && JSON.stringify(bodyJson.errors)))) || `HTTP ${res.status}`;
       lines.push(`<span class="fail">✗ Накладну не вдалося записати — ${escapeHtml(String(errMsg).slice(0,150))}</span>`);
     }
   }catch(err){
