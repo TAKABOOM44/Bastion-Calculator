@@ -1574,9 +1574,8 @@ el('smsSendBtn').addEventListener('click', () => {
   const phone = el('phone').value.trim();
   const text = el('smsText').value.trim();
   el('smsModalError').textContent = '';
-  if(!smsclubToken){ el('smsModalError').textContent = 'Спочатку збережи токен SMS Club.'; return; }
   if(!phone){ el('smsModalError').textContent = 'Не заповнено телефон клієнта.'; return; }
-  if(!text){ el('smsText').textContent = 'Текст повідомлення порожній.'; return; }
+  if(!text){ el('smsModalError').textContent = 'Текст повідомлення порожній.'; return; }
   openSmsConfirm(phone, text);
 });
 
@@ -1599,14 +1598,19 @@ el('smsConfirmOk').addEventListener('click', async () => {
   btn.disabled = true;
 
   let smsResultLine;
-  try{
-    const info = await smsclubCall('/send', { phone: [phone], message: text, src_addr: smsSelectedAlpha });
-    const smsId = info ? Object.keys(info)[0] : '';
-    attachSmsToLatestHistory(smsId);
-    smsResultLine = `<span class="ok">✓ SMS відправлено клієнту</span>`;
-  }catch(err){
-    smsResultLine = `<span class="fail">✗ SMS не відправлено — ${escapeHtml(err.message)}. Перевір токен SMS Club у налаштуваннях.</span>`;
+  let smsId = '';
+  if(!smsclubToken){
+    smsResultLine = `<span class="fail">✗ SMS не відправлено — токен SMS Club не підключено</span>`;
+  }else{
+    try{
+      const info = await smsclubCall('/send', { phone: [phone], message: text, src_addr: smsSelectedAlpha });
+      smsId = info ? Object.keys(info)[0] : '';
+      smsResultLine = `<span class="ok">✓ SMS відправлено клієнту</span>`;
+    }catch(err){
+      smsResultLine = `<span class="fail">✗ SMS не відправлено — ${escapeHtml(err.message)}</span>`;
+    }
   }
+  attachSmsToLatestHistory(smsId);
 
   const promResultLine = await pushTtnToProm();
 
