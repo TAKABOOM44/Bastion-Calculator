@@ -1572,7 +1572,7 @@ el('smsSendBtn').addEventListener('click', () => {
   el('smsModalError').textContent = '';
   if(!smsclubToken){ el('smsModalError').textContent = 'Спочатку збережи токен SMS Club (панель зверху сторінки).'; return; }
   if(!phone){ el('smsModalError').textContent = 'Не заповнено телефон клієнта у формі замовлення.'; return; }
-  if(!text){ el('smsModalError').textContent = 'Текст повідомлення порожній.'; return; }
+  if(!text){ el('smsText').textContent = 'Текст повідомлення порожній.'; return; }
   openSmsConfirm(phone, text);
 });
 
@@ -1715,11 +1715,9 @@ el('tgConfirmOk').addEventListener('click', async () => {
   }
 });
 /* ================= АВТОМАТИЧНЕ ОТРИМАННЯ ТТН З ТЕЛЕГРАМУ ================= */
-// Зберігаємо останній оброблений ID повідомлення, чтобы не считывать старые
 let tgLastUpdateId = loadLS('tg_last_update_id', 0);
 
 async function pollTelegramUpdates() {
-  // Если ключи не введены, ничего не делаем
   if (!tgBotToken || !tgChatId) return;
 
   const url = `${TELEGRAM_PROXY}/bot${tgBotToken}/getUpdates`;
@@ -1733,7 +1731,6 @@ async function pollTelegramUpdates() {
     const json = await res.json();
     if (!json.ok || !json.result || json.result.length === 0) return;
 
-    // Вытягиваем ID нашего бота из его токена
     const botId = tgBotToken.split(':')[0];
 
     for (const update of json.result) {
@@ -1741,31 +1738,24 @@ async function pollTelegramUpdates() {
       saveLS('tg_last_update_id', tgLastUpdateId);
 
       const msg = update.message;
-      // Проверяем: это сообщение в нужной группе и является ли оно ответом (Reply)?
       if (msg && String(msg.chat.id) === tgChatId && msg.reply_to_message) {
         
-        // Проверяем: это ответ ИМЕННО на сообщение нашего бота?
         if (String(msg.reply_to_message.from.id) === botId) {
           
-          // Ищем в тексте поставщика ТТН Новой Почты (14 цифр, начинаются на 20 или 59)
           const ttnMatch = msg.text ? msg.text.match(/\b(20|59)\d{12}\b/) : null;
           
           if (ttnMatch) {
             const foundTtn = ttnMatch[0];
             const originalText = msg.reply_to_message.text;
 
-            // Ищем, к какому заказу из нашей истории это относится
             const historyIndex = history.findIndex(h => originalText.includes(h.text.split('\n')[0]));
             
             if (historyIndex !== -1) {
-              // Сохраняем ТТН в историю заказов
               history[historyIndex].ttn = foundTtn;
               saveLS('np_history', history);
               
-              // Обновляем список заказов на экране
               renderHistory();
               
-              // Автоматически вставляем ТТН в панель отправки SMS, чтобы ты мог сразу нажать кнопку
               el('ttn').value = foundTtn;
               el('ttnStatusText').textContent = 'Нова ТТН отримана! Натисни "Перевірити"';
             }
@@ -1778,9 +1768,9 @@ async function pollTelegramUpdates() {
   }
 }
 
-// Запускаем невидимую проверку новых сообщений каждые 15 секунд
 setInterval(pollTelegramUpdates, 15000);
 /* ========================================================================= */
+
 /* ================= ПАНЕЛЬ ПІДКЛЮЧЕНЬ (ЗГОРТАННЯ) ================= */
 el('settingsToggleBtn').addEventListener('click', () => {
   el('settingsDrawer').classList.toggle('open');
