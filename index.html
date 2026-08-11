@@ -565,7 +565,7 @@ function buildMessage(){
     lines.push(addr);
   }
 
-  if(v('phone')) lines.push(v('phone'));
+  if(v('phone')) lines.push(v('phone').replace(/\D/g, ''));
   if(v('fullname')) lines.push(v('fullname'));
 
   if(state.pay === 'cod'){
