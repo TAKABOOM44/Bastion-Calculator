@@ -376,6 +376,12 @@ h1{
   border-color: var(--line-strong);
 }
 .btn-ghost:hover{ color:var(--text); border-color:var(--navy-dim); }
+.btn-telegram{
+  flex:1;
+  background:#229ED9; color:#fff; border-color:#229ED9;
+}
+.btn-telegram:hover{ background:#1c86b8; }
+.btn-telegram.copied{ background: var(--green); border-color: var(--green); }
 
 /* ---------- PREVIEW / TICKET ---------- */
 .ticket{
@@ -592,6 +598,16 @@ h1{
     <a href="https://my.smsclub.mobi/en/profile" target="_blank" rel="noopener">де взяти токен →</a>
   </div>
 
+  <div class="apibar">
+    <span class="dot" id="tgDot"></span>
+    <label>Telegram бот</label>
+    <input id="tgToken" type="text" placeholder="токен бота від @BotFather" autocomplete="off">
+    <input id="tgChatId" type="text" placeholder="chat_id групи (напр. -100123456789)" autocomplete="off" style="max-width:220px;">
+    <button id="tgSave">Зберегти</button>
+    <span class="status-text" id="tgStatus">не підключено — відправка в Telegram вимкнена</span>
+    <span class="status-text" style="width:100%; opacity:.75;">⚠ для відправки потрібен локальний проксі — запусти start-telegram-proxy.bat і залиш вікно відкритим</span>
+  </div>
+
   <div class="grid">
     <div class="panel">
       <div class="panel-title">Дані замовлення</div>
@@ -673,6 +689,7 @@ h1{
       <div class="ticket" id="ticket"><span class="ticket-label">preview</span></div>
       <div class="actions">
         <button class="btn btn-primary" id="copyBtn">Скопіювати</button>
+        <button class="btn btn-telegram" id="sendTgBtn">Відправити в Telegram</button>
         <button class="btn btn-ghost" id="clearBtn">Очистити форму</button>
       </div>
     </div>
@@ -766,6 +783,22 @@ h1{
     <div class="modal-actions">
       <button class="btn btn-ghost" id="smsConfirmCancel">Скасувати</button>
       <button class="btn btn-primary" id="smsConfirmOk">Підтвердити</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="tgConfirmOverlay">
+  <div class="modal-box modal-box-small">
+    <div class="modal-header">
+      <h3>Підтвердження</h3>
+    </div>
+    <div class="modal-body">
+      <p style="margin:0 0 4px;">Відправити замовлення в групу постачальників у Telegram?</p>
+      <div class="sms-confirm-preview" id="tgConfirmPreview"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="tgConfirmCancel">Скасувати</button>
+      <button class="btn btn-primary" id="tgConfirmOk">Підтвердити</button>
     </div>
   </div>
 </div>
@@ -1598,6 +1631,78 @@ async function checkSmsStatusForHistory(index){
   }
 }
 
+/* ================= TELEGRAM ================= */
+const TELEGRAM_PROXY = 'http://localhost:8788/telegram';
+let tgBotToken = loadLS('tg_bot_token', '8985597003:AAEXX2krUJTm4W5hdvV3EwXa46BW6F-Yy40');
+let tgChatId = loadLS('tg_chat_id', '-5166193124');
+
+function setTgStatus(mode, text){
+  const dot = el('tgDot');
+  if(!dot) return;
+  dot.className = 'dot' + (mode ? ' ' + mode : '');
+  el('tgStatus').textContent = text;
+}
+function refreshTgStatusText(){
+  if(!tgBotToken || !tgChatId){ setTgStatus('', 'не підключено — відправка в Telegram вимкнена'); return; }
+  setTgStatus('ok', 'підключено — не забудь запустити проксі');
+}
+function applyTgSettings(){
+  tgBotToken = el('tgToken').value.trim();
+  tgChatId = el('tgChatId').value.trim();
+  saveLS('tg_bot_token', tgBotToken);
+  saveLS('tg_chat_id', tgChatId);
+  refreshTgStatusText();
+}
+el('tgSave').addEventListener('click', applyTgSettings);
+
+async function sendToTelegram(text){
+  const url = `${TELEGRAM_PROXY}/bot${tgBotToken}/sendMessage`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: tgChatId, text })
+  });
+  let json = null;
+  try{ json = await res.json(); }catch(e){}
+  if(!json || !json.ok) throw new Error((json && json.description) || `HTTP ${res.status}`);
+  return json.result;
+}
+
+el('sendTgBtn').addEventListener('click', () => {
+  const msg = buildMessage();
+  if(!msg.trim()) return;
+  if(!tgBotToken || !tgChatId){ alert('Спочатку підключи Telegram-бота (панель зверху сторінки).'); return; }
+  el('tgConfirmPreview').textContent = msg;
+  el('tgConfirmOverlay').classList.add('open');
+});
+el('tgConfirmCancel').addEventListener('click', () => el('tgConfirmOverlay').classList.remove('open'));
+el('tgConfirmOverlay').addEventListener('click', (e) => { if(e.target === el('tgConfirmOverlay')) el('tgConfirmOverlay').classList.remove('open'); });
+
+el('tgConfirmOk').addEventListener('click', async () => {
+  const msg = buildMessage();
+  const btn = el('tgConfirmOk');
+  const original = btn.textContent;
+  btn.textContent = 'Відправка…';
+  btn.disabled = true;
+  try{
+    await sendToTelegram(msg);
+    el('tgConfirmOverlay').classList.remove('open');
+    pushHistory(msg);
+    const sendBtn = el('sendTgBtn');
+    const orig2 = sendBtn.textContent;
+    sendBtn.textContent = 'Відправлено ✓';
+    sendBtn.classList.add('copied');
+    setTimeout(() => { sendBtn.textContent = orig2; sendBtn.classList.remove('copied'); }, 1800);
+  }catch(err){
+    el('tgConfirmOverlay').classList.remove('open');
+    const hint = err.message.includes('fetch') ? ' — переконайся, що запущено start-telegram-proxy.bat' : '';
+    alert('Помилка відправки в Telegram: ' + err.message + hint);
+  }finally{
+    btn.textContent = original;
+    btn.disabled = false;
+  }
+});
+
 /* ================= INIT ================= */
 el('apiKey').value = apiKey;
 applyApiKey(apiKey);
@@ -1605,6 +1710,9 @@ el('promToken').value = promToken;
 refreshPromStatusText();
 el('smsclubToken').value = smsclubToken;
 refreshSmsclubStatusText();
+el('tgToken').value = tgBotToken;
+el('tgChatId').value = tgChatId;
+refreshTgStatusText();
 renderSuggestions();
 renderHistory();
 render();
