@@ -694,6 +694,12 @@ h1{
         <button type="button" class="pay-opt" data-pay="none">Без суми</button>
       </div>
 
+      <!-- НОВОЕ ПОЛЕ ДЛЯ ID ЗАКАЗА PROM (для связки с автообновлением статуса) -->
+      <div class="field" style="margin-top:14px;">
+        <label>№ замовлення Prom <span class="hint">(9 цифр, з кабінету Prom)</span></label>
+        <input id="promOrderId" placeholder="напр. 420567978" autocomplete="off">
+      </div>
+
     </div>
 
     <div class="panel">
@@ -816,7 +822,7 @@ h1{
 </div>
 
 <script>
-const fields = ['product','size','region','district','city','street','warehouse','phone','fullname','amount'];
+const fields = ['product','size','region','district','city','street','warehouse','phone','fullname','amount','promOrderId'];
 const state = { pay: 'cod', cityRef: null, warehouses: [] };
 
 const el = id => document.getElementById(id);
@@ -930,7 +936,8 @@ function pushHistory(msg){
     pay: state.pay,
     ttn: '',
     smsId: '',
-    smsStatus: ''
+    smsStatus: '',
+    promOrderId: el('promOrderId').value.trim()
   };
   history.unshift(entry);
   if(history.length > 30) history = history.slice(0,30);
@@ -988,7 +995,7 @@ function renderHistory(){
   }
 
   const filtered = historySearchQuery
-    ? history.filter(h => [h.text, h.phone, h.fullname, h.ttn].filter(Boolean).join(' ').toLowerCase().includes(historySearchQuery))
+    ? history.filter(h => [h.text, h.phone, h.fullname, h.ttn, h.promOrderId].filter(Boolean).join(' ').toLowerCase().includes(historySearchQuery))
     : history;
 
   if(filtered.length === 0){
@@ -999,6 +1006,7 @@ function renderHistory(){
   list.innerHTML = filtered.map(h => {
     const i = history.indexOf(h);
     const metaParts = [];
+    if(h.promOrderId) metaParts.push(`Prom ID: ${escapeHtml(h.promOrderId)}`);
     if(h.ttn) metaParts.push(`ТТН: ${escapeHtml(h.ttn)}`);
     if(h.smsStatus) metaParts.push(`SMS: ${escapeHtml(h.smsStatus)}`);
     const metaLine = metaParts.length
@@ -1007,7 +1015,7 @@ function renderHistory(){
     return `
     <div class="history-item">
       <div class="hi-main">
-        <span class="hi-text">${escapeHtml(h.text.split('\\n')[0])}</span>
+        <span class="hi-text">${escapeHtml(h.text.split('\n')[0])}</span>
         <span class="hi-time">${escapeHtml(h.time)}</span>
       </div>
       ${metaLine}
@@ -1199,7 +1207,7 @@ function makeAutocomplete({ inputEl, listEl, fetchFn, renderItem, onSelect, minL
     const myId = ++requestId;
     try{
       const results = await fetchFn(q);
-      if(myId !== requestId) return; // stale response
+      if(myId !== requestId) return;
       items = results;
       if(!items.length){ openWith('<div class="ac-empty">нічого не знайдено</div>'); return; }
       openWith(items.map((it,i) => `<div class="ac-item" data-i="${i}">${renderItem(it)}</div>`).join(''));
@@ -1269,7 +1277,7 @@ makeAutocomplete({
   }
 });
 
-// Warehouse autocomplete (loads full list for city once, filters locally)
+// Warehouse autocomplete
 makeAutocomplete({
   inputEl: el('whSearch'),
   listEl: el('whAc'),
@@ -1292,7 +1300,6 @@ makeAutocomplete({
     render();
   }
 });
-// allow opening warehouse list on focus even with empty query
 el('whSearch').addEventListener('focus', ()=>{
   if(!apiKey || !state.cityRef) return;
   el('whSearch').dispatchEvent(new Event('input'));
@@ -1318,9 +1325,6 @@ function refreshPromStatusText(){
   }
 }
 
-// Prom.ua may return "name" in the shop's default interface language (often ru)
-// even when a separate Ukrainian translation exists on a per-product basis.
-// We try every known place a uk name could live BEFORE falling back to plain "name".
 function extractUkName(p){
   if(p.name_multilang){
     if(p.name_multilang.uk) return p.name_multilang.uk;
@@ -1345,7 +1349,7 @@ async function promFetchAllProducts(){
   const all = [];
   let lastId = null;
   const pageLimit = 100;
-  const maxPages = 100; // safety cap ~10 000 товарів
+  const maxPages = 100;
   try{
     for(let page = 0; page < maxPages; page++){
       const url = new URL(PROM_URL);
@@ -1362,10 +1366,6 @@ async function promFetchAllProducts(){
       setPromStatus('', `завантаження каталогу… ${all.length} товарів`);
       if(batch.length < pageLimit) break;
       lastId = batch[batch.length - 1].id;
-    }
-    if(all.length){
-      console.log('[prom debug] приклад товару як його бачить API:', all[0]);
-      console.log('[prom debug] щоб побачити — відкрий консоль браузера (F12 → Console) саме зараз');
     }
     promCatalog = {
       products: all.map(p => ({
@@ -1394,7 +1394,7 @@ el('promSave').addEventListener('click', ()=> applyPromToken(el('promToken').val
 el('promToken').addEventListener('keydown', (e)=>{ if(e.key==='Enter') applyPromToken(el('promToken').value); });
 el('promLoad').addEventListener('click', promFetchAllProducts);
 
-// Product autocomplete — searches the locally cached Prom catalog (no live search endpoint, so we filter client-side)
+// Product autocomplete
 makeAutocomplete({
   inputEl: el('product'),
   listEl: el('productAc'),
@@ -1414,6 +1414,7 @@ makeAutocomplete({
     render();
   }
 });
+
 function applyApiKey(key){
   apiKey = key.trim();
   saveLS('np_api_key', apiKey);
@@ -1475,9 +1476,9 @@ async function smsclubCall(path, body){
     body: JSON.stringify(body || {})
   });
   let json = null;
-  try{ json = await res.json(); }catch(e){ /* тіло не JSON */ }
+  try{ json = await res.json(); }catch(e){}
   if(!res.ok){
-    const map = {400:'дані не пройшли перевірку', 401:'токен не розпізнано', 429:'перевищено ліміт запитів', 453:'дублікат SMS протягом 2 хвилин', 500:'помилка сервісу, спробуйте пізніше'};
+    const map = {400:'дані не пройшли перевірку', 401:'токен не розпізнано', 429:'перевищено ліміт запитів', 453:'дублікат SMS протягом 2 хвилин', 500:'помилка сервісу'};
     throw new Error(`HTTP ${res.status}` + (map[res.status] ? ' — ' + map[res.status] : ''));
   }
   if(json && json.error) throw new Error(json.error);
@@ -1491,7 +1492,6 @@ function formatPhoneForSms(raw){
   return digits;
 }
 
-/* ---- Модалка відправки SMS ---- */
 function renderSmsAlphaOptions(){
   const select = el('smsAlpha');
   const list = smsAlphaList.length ? smsAlphaList : [smsSelectedAlpha];
@@ -1570,13 +1570,12 @@ el('smsSendBtn').addEventListener('click', () => {
   const phone = el('phone').value.trim();
   const text = el('smsText').value.trim();
   el('smsModalError').textContent = '';
-  if(!smsclubToken){ el('smsModalError').textContent = 'Спочатку збережи токен SMS Club (панель зверху сторінки).'; return; }
-  if(!phone){ el('smsModalError').textContent = 'Не заповнено телефон клієнта у формі замовлення.'; return; }
+  if(!smsclubToken){ el('smsModalError').textContent = 'Спочатку збережи токен SMS Club.'; return; }
+  if(!phone){ el('smsModalError').textContent = 'Не заповнено телефон клієнта.'; return; }
   if(!text){ el('smsText').textContent = 'Текст повідомлення порожній.'; return; }
   openSmsConfirm(phone, text);
 });
 
-/* ---- Модалка підтвердження ---- */
 function openSmsConfirm(phone, text){
   el('smsConfirmPhone').textContent = formatPhoneForSms(phone);
   el('smsConfirmPreview').textContent = text;
@@ -1607,15 +1606,13 @@ el('smsConfirmOk').addEventListener('click', async () => {
     setTimeout(() => { sendBtn.textContent = orig2; sendBtn.classList.remove('copied'); }, 1800);
   }catch(err){
     closeSmsConfirm();
-    const hint = err.message.includes('fetch') ? ' — можливо потрібен локальний проксі, як для Prom.ua' : '';
-    el('smsModalError').textContent = 'Помилка відправки: ' + err.message + hint;
+    el('smsModalError').textContent = 'Помилка відправки: ' + err.message;
   }finally{
     btn.textContent = original;
     btn.disabled = false;
   }
 });
 
-/* ---- Прив'язка SMS до історії + перевірка статусу доставки ---- */
 function attachSmsToLatestHistory(smsId){
   if(!history.length) return;
   history[0].ttn = el('ttn').value.trim();
@@ -1656,7 +1653,7 @@ function setTgStatus(mode, text){
 }
 function refreshTgStatusText(){
   if(!tgBotToken || !tgChatId){ setTgStatus('', 'не підключено — відправка в Telegram вимкнена'); return; }
-  setTgStatus('ok', 'підключено — не забудь запустити проксі');
+  setTgStatus('ok', 'підключено — проксі активний');
 }
 function applyTgSettings(){
   tgBotToken = el('tgToken').value.trim();
@@ -1683,7 +1680,7 @@ async function sendToTelegram(text){
 el('sendTgBtn').addEventListener('click', () => {
   const msg = buildMessage();
   if(!msg.trim()) return;
-  if(!tgBotToken || !tgChatId){ alert('Спочатку підключи Telegram-бота (панель зверху сторінки).'); return; }
+  if(!tgBotToken || !tgChatId){ alert('Спочатку підключи Telegram-бота.'); return; }
   el('tgConfirmPreview').textContent = msg;
   el('tgConfirmOverlay').classList.add('open');
 });
@@ -1707,14 +1704,14 @@ el('tgConfirmOk').addEventListener('click', async () => {
     setTimeout(() => { sendBtn.textContent = orig2; sendBtn.classList.remove('copied'); }, 1800);
   }catch(err){
     el('tgConfirmOverlay').classList.remove('open');
-    const hint = err.message.includes('fetch') ? ' — переконайся, що запущено start-telegram-proxy.bat' : '';
-    alert('Помилка відправки в Telegram: ' + err.message + hint);
+    alert('Помилка відправки в Telegram: ' + err.message);
   }finally{
     btn.textContent = original;
     btn.disabled = false;
   }
 });
-/* ================= АВТОМАТИЧНЕ ОТРИМАННЯ ТТН З ТЕЛЕГРАМУ ================= */
+
+/* ================= АВТОМАТИЧНЕ ОТРИМАННЯ ТТН + АВТО-ПЕРЕДАЧА НА PROM.UA ================= */
 let tgLastUpdateId = loadLS('tg_last_update_id', 0);
 
 async function pollTelegramUpdates() {
@@ -1757,7 +1754,35 @@ async function pollTelegramUpdates() {
               renderHistory();
               
               el('ttn').value = foundTtn;
-              el('ttnStatusText').textContent = 'Нова ТТН отримана! Натисни "Перевірити"';
+              el('ttnStatusText').textContent = 'Нова ТТН отримана!';
+
+              // БОЕВАЯ ОТПРАВКА НА PROM.UA АВТОМАТИЧЕСКИ
+              const savedPromId = history[historyIndex].promOrderId;
+              if (savedPromId && savedPromId.length >= 8) {
+                if (promToken) {
+                  fetch('http://localhost:8787/prom/api/v1/orders/set_status', {
+                    method: 'POST',
+                    headers: { 
+                      'Content-Type': 'application/json', 
+                      'Authorization': 'Bearer ' + promToken 
+                    },
+                    body: JSON.stringify({ 
+                      status: 'received', 
+                      ids: [parseInt(savedPromId)], 
+                      declaration_id: foundTtn 
+                    })
+                  })
+                  .then(r => {
+                    console.log('Prom.ua оновлено, статус відповіді:', r.status);
+                    if(r.ok) {
+                      el('ttnStatusText').textContent = 'ТТН передано на Prom.ua ✓';
+                    } else {
+                      r.text().then(errText => console.log('Деталі помилки від Prom:', errText));
+                    }
+                  })
+                  .catch(e => console.log('Помилка мережі Prom:', e));
+                }
+              }
             }
           }
         }
@@ -1771,7 +1796,6 @@ async function pollTelegramUpdates() {
 setInterval(pollTelegramUpdates, 15000);
 /* ========================================================================= */
 
-/* ================= ПАНЕЛЬ ПІДКЛЮЧЕНЬ (ЗГОРТАННЯ) ================= */
 el('settingsToggleBtn').addEventListener('click', () => {
   el('settingsDrawer').classList.toggle('open');
 });
