@@ -1761,7 +1761,7 @@ async function pollTelegramUpdates() {
               if (savedPromId && savedPromId.length >= 8) {
                 if (promToken) {
                   fetch('http://localhost:8787/prom/api/v1/orders/set_status', {
-                    method: 'POST',
+                    method: 'PUT',
                     headers: { 
                       'Content-Type': 'application/json', 
                       'Authorization': 'Bearer ' + promToken 
