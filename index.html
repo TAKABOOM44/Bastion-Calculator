@@ -683,6 +683,12 @@ h1{
         <input id="fullname" placeholder="Гончаренко Олександр Іванович">
       </div>
 
+      <!-- ВЕРНУТОЕ ПОЛЕ ДЛЯ НОМЕРА ЗАКАЗА PROM -->
+      <div class="field">
+        <label>№ замовлення Prom <span class="hint">(9 цифр)</span></label>
+        <input id="promOrderId" placeholder="420567978" autocomplete="off">
+      </div>
+
       <div class="field" id="amountField">
         <label>Сума накладеного платежу</label>
         <input id="amount" placeholder="1469">
@@ -692,12 +698,6 @@ h1{
         <button type="button" class="pay-opt active" data-pay="cod">Накладений платіж</button>
         <button type="button" class="pay-opt" data-pay="prepaid">Передоплата</button>
         <button type="button" class="pay-opt" data-pay="none">Без суми</button>
-      </div>
-
-      <!-- НОВОЕ ПОЛЕ ДЛЯ ID ЗАКАЗА PROM (для связки с автообновлением статуса) -->
-      <div class="field" style="margin-top:14px;">
-        <label>№ замовлення Prom <span class="hint">(9 цифр, з кабінету Prom)</span></label>
-        <input id="promOrderId" placeholder="напр. 420567978" autocomplete="off">
       </div>
 
     </div>
@@ -835,7 +835,7 @@ function saveLS(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
 let history = loadLS('np_history', []);
 let suggestions = loadLS('np_suggestions', { region:[], district:[], city:[], street:[] });
 let apiKey = loadLS('np_api_key', '');
-let whCache = {}; // cityRef -> warehouses[]
+let whCache = {};
 
 /* ================= MESSAGE BUILDER ================= */
 function buildMessage(){
