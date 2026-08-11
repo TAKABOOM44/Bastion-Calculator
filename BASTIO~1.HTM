@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Диспетчер замовлень</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root{
+  --bg: #f2e9d8;
+  --bg-soft: #f8f1e3;
+  --panel: #fffdf8;
+  --panel-2: #f6ecd9;
+  --input-bg: #f8f1e3;
+  --line: #e3d5b7;
+  --line-strong: #cdb98c;
+  --navy: #2c4560;
+  --navy-dim: #5c7288;
+  --navy-soft: #9fb1c2;
+  --amber: #c98442;
+  --amber-dim: #a8682e;
+  --text: #2b2419;
+  --text-dim: #8d7f68;
+  --green: #5f7f4f;
+  --red: #af5136;
+  --radius: 4px;
+}
+
+*{ box-sizing:border-box; }
+
+html,body{
+  margin:0; padding:0;
+  color: var(--text);
+  font-family:'Manrope', sans-serif;
+  min-height:100vh;
+  background: var(--bg);
+}
+
+/* ---------- ATMOSPHERIC BACKDROP ---------- */
+.backdrop{
+  position:fixed; inset:0;
+  z-index:0;
+  overflow:hidden;
+  pointer-events:none;
+}
+.backdrop::before{
+  content:"";
+  position:absolute; inset:0;
+  background:
+    radial-gradient(900px 560px at 82% -8%, rgba(201,132,66,0.20), transparent 60%),
+    radial-gradient(1100px 700px at -10% 12%, rgba(44,69,96,0.10), transparent 55%),
+    linear-gradient(180deg, #eef2ea 0%, #f2ecd9 32%, #f2e9d8 100%);
+}
+.backdrop .glow{
+  position:absolute; top:-12%; right:-6%;
+  width:640px; height:640px;
+  border-radius:50%;
+  background: radial-gradient(circle, rgba(230,178,110,0.45), transparent 70%);
+  filter: blur(30px);
+}
+.backdrop .glow2{
+  position:absolute; bottom:-10%; left:-8%;
+  width:520px; height:520px;
+  border-radius:50%;
+  background: radial-gradient(circle, rgba(92,114,136,0.22), transparent 70%);
+  filter: blur(40px);
+}
+.backdrop .grain{
+  position:absolute; inset:0;
+  opacity:0.03;
+  mix-blend-mode:multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.wrap{
+  position:relative; z-index:1;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px 20px 60px;
+}
+
+/* ---------- HEADER ---------- */
+header{
+  display:flex; align-items:flex-end; justify-content:space-between;
+  border-bottom: 2px solid var(--line-strong);
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.title-block{
+  display:flex; align-items:center; gap:14px;
+}
+.badge{
+  width:46px;height:46px;
+  border:2px solid var(--navy);
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Fraunces',serif;
+  font-weight:600; font-size:17px;
+  color:var(--navy);
+  flex-shrink:0;
+  position:relative;
+  background: var(--panel);
+}
+.badge::after{
+  content:"";
+  position:absolute; inset:-6px;
+  border:1px dashed var(--line-strong);
+  border-radius:50%;
+}
+h1{
+  font-family:'Fraunces', serif;
+  font-weight: 600;
+  font-size: 27px;
+  letter-spacing: 0.2px;
+  margin:0;
+  color: var(--text);
+}
+.sub{
+  font-size:11.5px;
+  letter-spacing:1px;
+  text-transform:uppercase;
+  color: var(--text-dim);
+  margin-top:4px;
+}
+.clock{
+  font-family:'JetBrains Mono', monospace;
+  font-size:12px;
+  color:var(--navy);
+  letter-spacing:1px;
+  text-align:right;
+}
+.clock .date{ color:var(--text-dim); display:block; font-size:11px; margin-top:2px;}
+
+/* ---------- API KEY BAR ---------- */
+.apibar{
+  display:flex; align-items:center; gap:10px;
+  background: var(--panel);
+  border:1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  font-size:12px;
+  box-shadow: 0 1px 2px rgba(60,45,20,0.04);
+}
+.apibar .dot{
+  width:8px; height:8px; border-radius:50%;
+  background: var(--text-dim);
+  flex-shrink:0;
+}
+.apibar .dot.ok{ background: var(--green); box-shadow:0 0 6px rgba(95,127,79,0.5); }
+.apibar .dot.err{ background: var(--red); box-shadow:0 0 6px rgba(175,81,54,0.5); }
+.apibar label{ color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; font-size:10px; flex-shrink:0;}
+.apibar input{
+  flex:1; min-width:220px;
+  background: var(--bg-soft);
+  border:1px solid var(--line);
+  color: var(--text);
+  padding: 7px 10px;
+  font-family:'JetBrains Mono', monospace;
+  font-size:12px;
+  border-radius: var(--radius);
+}
+.apibar input:focus{ outline:none; border-color:var(--navy-dim); }
+.apibar .status-text{ color:var(--text-dim); font-size:11px; flex-shrink:0; }
+.apibar a{ color:var(--navy); text-decoration:none; border-bottom:1px dotted var(--navy-soft); font-size:11px; flex-shrink:0;}
+.apibar a:hover{ color:var(--amber-dim); }
+.apibar button{
+  background:var(--navy); border:1px solid var(--navy); color:#fff;
+  padding:7px 12px; border-radius:var(--radius); font-size:10px; text-transform:uppercase; letter-spacing:1px;
+  cursor:pointer; font-family:'Manrope',sans-serif; font-weight:600; flex-shrink:0;
+}
+.apibar button:hover{ background: var(--navy-dim); }
+
+/* ---------- MAIN GRID ---------- */
+.grid{
+  display:grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 18px;
+  align-items:start;
+}
+@media(max-width:900px){ .grid{ grid-template-columns:1fr; } }
+
+.panel{
+  background: var(--panel);
+  border:1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px 18px 20px;
+  box-shadow: 0 2px 10px rgba(60,45,20,0.05);
+}
+.panel-title{
+  font-family:'Fraunces', serif;
+  font-weight:600;
+  letter-spacing:0.3px;
+  font-size:15px;
+  color: var(--navy);
+  margin: 0 0 14px;
+  display:flex; align-items:center; gap:8px;
+}
+.panel-title::before{
+  content:""; width:16px; height:2px; background:var(--amber);
+}
+
+.field-row{
+  display:grid; grid-template-columns: 1fr 1fr; gap:10px;
+}
+.field{ margin-bottom:12px; position:relative; }
+.field label{
+  display:block;
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  color: var(--text-dim);
+  margin-bottom:5px;
+}
+.field label .hint{ color: var(--amber-dim); text-transform:none; letter-spacing:0; font-style:italic; }
+.field input, .field textarea{
+  width:100%;
+  background: var(--bg-soft);
+  border:1px solid var(--line);
+  color: var(--text);
+  padding: 9px 10px;
+  font-family:'JetBrains Mono', monospace;
+  font-size:13px;
+  border-radius: var(--radius);
+  transition: border-color .15s, box-shadow .15s;
+}
+.field input:focus, .field textarea:focus{
+  outline:none;
+  border-color: var(--navy-dim);
+  box-shadow: 0 0 0 3px rgba(44,69,96,0.10);
+}
+.field textarea{ resize: vertical; min-height:40px; font-family:'JetBrains Mono',monospace; white-space:pre-wrap; word-break:break-word; }
+#product{ min-height:76px; line-height:1.45; }
+.field input:disabled{ opacity:.45; cursor:not-allowed; }
+.field.locked input{ color: var(--navy); }
+
+/* ---------- AUTOCOMPLETE DROPDOWN ---------- */
+.ac-list{
+  position:absolute;
+  top: calc(100% + 3px);
+  left:0; right:0;
+  background: var(--panel);
+  border:1px solid var(--line-strong);
+  border-radius: var(--radius);
+  max-height: 260px;
+  overflow-y:auto;
+  z-index: 50;
+  box-shadow: 0 12px 26px rgba(60,45,20,0.14);
+  display:none;
+}
+.ac-list.open{ display:block; }
+.ac-item{
+  padding: 8px 12px;
+  font-size:12.5px;
+  cursor:pointer;
+  border-bottom:1px solid var(--line);
+  display:flex; flex-direction:column; gap:2px;
+}
+.ac-item:last-child{ border-bottom:none; }
+.ac-item .ac-main{ color:var(--text); font-family:'JetBrains Mono',monospace; }
+.ac-item .ac-meta{ color:var(--text-dim); font-size:10.5px; }
+.ac-item.hi{ background: rgba(201,132,66,0.13); }
+.ac-item.hi .ac-main{ color: var(--amber-dim); }
+.ac-empty{ padding:10px 12px; font-size:12px; color:var(--text-dim); font-style:italic; }
+.ac-loading{ padding:10px 12px; font-size:12px; color:var(--navy-dim); }
+
+.pay-toggle{
+  display:flex; gap:8px; margin-bottom:12px;
+}
+.pay-opt{
+  flex:1;
+  border:1px solid var(--line);
+  background:var(--bg-soft);
+  color:var(--text-dim);
+  padding:9px;
+  font-size:11px;
+  letter-spacing:.5px;
+  text-transform:uppercase;
+  border-radius:var(--radius);
+  cursor:pointer;
+  text-align:center;
+  font-family:'Manrope',sans-serif;
+  font-weight:600;
+}
+.pay-opt.active{
+  border-color:var(--amber);
+  color:var(--amber-dim);
+  background: rgba(201,132,66,0.10);
+}
+
+.actions{
+  display:flex; gap:10px; margin-top:6px;
+}
+.btn{
+  font-family:'Manrope',sans-serif;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  font-size:12.5px;
+  font-weight:700;
+  padding: 12px 18px;
+  border-radius: var(--radius);
+  border:1px solid transparent;
+  cursor:pointer;
+  transition: transform .08s ease, filter .15s, background .15s;
+}
+.btn:active{ transform: scale(0.97); }
+.btn-primary{
+  flex:1;
+  background: var(--amber);
+  color: #fffaf2;
+  border-color: var(--amber);
+}
+.btn-primary:hover{ background: var(--amber-dim); }
+.btn-primary.copied{
+  background: var(--green);
+  border-color: var(--green);
+}
+.btn-ghost{
+  background:transparent;
+  color: var(--text-dim);
+  border-color: var(--line-strong);
+}
+.btn-ghost:hover{ color:var(--text); border-color:var(--navy-dim); }
+
+/* ---------- PREVIEW / TICKET ---------- */
+.ticket{
+  background: repeating-linear-gradient(180deg, var(--bg-soft) 0px, var(--bg-soft) 27px, rgba(44,69,96,0.02) 28px);
+  border:1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  padding: 16px 16px 16px 18px;
+  min-height: 210px;
+  white-space: pre-wrap;
+  font-family:'JetBrains Mono', monospace;
+  font-size: 13.5px;
+  line-height: 27px;
+  color: var(--text);
+  position: relative;
+  overflow:hidden;
+}
+.ticket:empty::before{
+  content: "Заповніть поля зліва — тут з'явиться готовий текст для постачальника";
+  color: var(--text-dim);
+  font-style: italic;
+}
+.ticket-label{
+  position:absolute; top:8px; right:12px;
+  font-size:9px; letter-spacing:1.5px; color:var(--text-dim); text-transform:uppercase;
+}
+
+/* ---------- HISTORY ---------- */
+.history{ margin-top:22px; }
+.history-list{
+  display:flex; flex-direction:column; gap:8px;
+  max-height: 340px;
+  overflow-y:auto;
+  padding-right:4px;
+}
+.history-item{
+  border:1px solid var(--line);
+  background: var(--panel-2);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  display:flex; align-items:center; gap:10px;
+  font-size:12px;
+}
+.history-item .hi-text{
+  flex:1; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  font-family:'JetBrains Mono',monospace;
+}
+.history-item .hi-time{ color:var(--text-dim); font-size:10px; flex-shrink:0; font-family:'JetBrains Mono',monospace; }
+.history-item button{
+  background:none; border:1px solid var(--line-strong); color:var(--text-dim);
+  border-radius:2px; padding:5px 8px; font-size:10px; cursor:pointer; font-family:'Manrope',sans-serif; font-weight:600;
+  flex-shrink:0;
+}
+.history-item button:hover{ color:var(--amber-dim); border-color:var(--amber-dim); }
+.history-empty{ color:var(--text-dim); font-size:12px; font-style:italic; padding:8px 0; }
+
+::-webkit-scrollbar{ width:8px; }
+::-webkit-scrollbar-thumb{ background:var(--line-strong); border-radius:4px; }
+::-webkit-scrollbar-track{ background:transparent; }
+</style>
+</head>
+<body>
+
+<div class="backdrop">
+  <div class="grain"></div>
+  <div class="glow"></div>
+  <div class="glow2"></div>
+</div>
+
+<div class="wrap">
+
+  <header>
+    <div class="title-block">
+      <div class="badge">НП</div>
+      <div>
+        <h1>Диспетчер замовлень</h1>
+        <div class="sub">Формування повідомлення постачальнику під час дзвінка</div>
+      </div>
+    </div>
+    <div class="clock">
+      <span id="clockTime">--:--</span>
+      <span class="date" id="clockDate">--</span>
+    </div>
+  </header>
+
+  <div class="apibar">
+    <span class="dot" id="apiDot"></span>
+    <label>NP API ключ</label>
+    <input id="apiKey" type="text" placeholder="встав сюди ключ з кабінету Нової пошти" autocomplete="off">
+    <button id="apiSave">Зберегти</button>
+    <span class="status-text" id="apiStatus">не підключено — місто/відділення вводяться вручну</span>
+    <a href="https://new.novaposhta.ua/dashboard" target="_blank" rel="noopener">де взяти ключ →</a>
+  </div>
+
+  <div class="apibar">
+    <span class="dot" id="promDot"></span>
+    <label>Prom.ua токен</label>
+    <input id="promToken" type="text" placeholder="встав сюди токен з кабінету Prom.ua" autocomplete="off">
+    <button id="promSave">Зберегти</button>
+    <button id="promLoad">Завантажити каталог</button>
+    <span class="status-text" id="promStatus">не підключено — товар вводиться вручну</span>
+    <a href="https://my.prom.ua/cms/settings/public_api_tokens" target="_blank" rel="noopener">де взяти токен →</a>
+    <span class="status-text" style="width:100%; opacity:.75;">⚠ перед завантаженням каталогу запусти start-prom-proxy.bat і залиш вікно відкритим</span>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="panel-title">Дані замовлення</div>
+
+      <div class="field">
+        <label>Товар <span class="hint" id="productHint"></span></label>
+        <textarea id="product" rows="3" placeholder='Почни вводити назву або артикул — підтягнеться з каталогу Prom, або впиши вручну'></textarea>
+        <div class="ac-list" id="productAc"></div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Розмір</label>
+          <input id="size" placeholder="59-60">
+        </div>
+        <div class="field">
+          <label>Телефон отримувача</label>
+          <input id="phone" placeholder="095 627 4032">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Місто / село <span class="hint" id="cityHint"></span></label>
+          <input id="city" placeholder="почніть вводити назву..." autocomplete="off">
+          <div class="ac-list" id="cityAc"></div>
+        </div>
+        <div class="field">
+          <label>Область</label>
+          <input id="region" list="regionList" placeholder="Запорізька">
+          <datalist id="regionList"></datalist>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Район <span class="hint">(необов'язково)</span></label>
+          <input id="district" list="districtList" placeholder="Запорізький">
+          <datalist id="districtList"></datalist>
+        </div>
+        <div class="field">
+          <label>Відділення Нової пошти <span class="hint" id="whHint"></span></label>
+          <input id="whSearch" placeholder="спочатку виберіть місто" autocomplete="off" disabled>
+          <div class="ac-list" id="whAc"></div>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Вулиця, будинок</label>
+          <input id="street" placeholder="заповнюється автоматично">
+        </div>
+        <div class="field">
+          <label>№ відділення</label>
+          <input id="warehouse" placeholder="заповнюється автоматично">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>ПІБ отримувача</label>
+        <input id="fullname" placeholder="Гончаренко Олександр Іванович">
+      </div>
+
+      <div class="field" id="amountField">
+        <label>Сума накладеного платежу</label>
+        <input id="amount" placeholder="1469">
+      </div>
+      <label style="display:block;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);margin-bottom:6px;">Оплата</label>
+      <div class="pay-toggle">
+        <button type="button" class="pay-opt active" data-pay="cod">Накладений платіж</button>
+        <button type="button" class="pay-opt" data-pay="prepaid">Передоплата</button>
+        <button type="button" class="pay-opt" data-pay="none">Без суми</button>
+      </div>
+
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Готове повідомлення</div>
+      <div class="ticket" id="ticket"><span class="ticket-label">preview</span></div>
+      <div class="actions">
+        <button class="btn btn-primary" id="copyBtn">Скопіювати</button>
+        <button class="btn btn-ghost" id="clearBtn">Очистити форму</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="history panel">
+    <div class="panel-title">Історія замовлень (останні 30)</div>
+    <div class="history-list" id="historyList"></div>
+  </div>
+
+</div>
+
+<script>
+const fields = ['product','size','region','district','city','street','warehouse','phone','fullname','amount'];
+const state = { pay: 'cod', cityRef: null, warehouses: [] };
+
+const el = id => document.getElementById(id);
+
+function loadLS(key, fallback){
+  try{ return JSON.parse(localStorage.getItem(key)) ?? fallback; }catch(e){ return fallback; }
+}
+function saveLS(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+
+let history = loadLS('np_history', []);
+let suggestions = loadLS('np_suggestions', { region:[], district:[], city:[], street:[] });
+let apiKey = loadLS('np_api_key', '');
+let whCache = {}; // cityRef -> warehouses[]
+
+/* ================= MESSAGE BUILDER ================= */
+function buildMessage(){
+  const v = id => el(id).value.trim();
+  const lines = [];
+
+  if(v('product')) lines.push(v('product'));
+  if(v('size')) lines.push(`розмір ${v('size')}`);
+
+  const region = v('region'), district = v('district'), city = v('city');
+  if(city || region || district){
+    let loc = city ? `місто ${city}` : 'місто —';
+    if(district) loc += `, ${district} район`;
+    if(region) loc += `, ${region} область`;
+    lines.push(loc);
+  }
+
+  const street = v('street'), wh = v('warehouse');
+  if(street || wh){
+    let addr = street ? `${street}, ` : '';
+    addr += wh ? `Відділення Нової пошти №${wh}` : 'Відділення Нової пошти №—';
+    lines.push(addr);
+  }
+
+  if(v('phone')) lines.push(v('phone'));
+  if(v('fullname')) lines.push(v('fullname'));
+
+  if(state.pay === 'cod'){
+    lines.push(`Наложений платіж ${v('amount') || '—'}`);
+  } else if(state.pay === 'prepaid'){
+    lines.push('Передоплата (100%)');
+  }
+
+  return lines.join('\n');
+}
+
+function render(){
+  const msg = buildMessage();
+  const ticket = el('ticket');
+  const hasContent = fields.some(f => el(f).value.trim() !== '');
+  ticket.innerHTML = hasContent ? '<span class="ticket-label">preview</span>' + escapeHtml(msg).replace(/\n/g,'<br>') : '<span class="ticket-label">preview</span>';
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+fields.forEach(f => el(f).addEventListener('input', render));
+
+/* ================= PAY TOGGLE ================= */
+document.querySelectorAll('.pay-opt').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.pay-opt').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    state.pay = btn.dataset.pay;
+    el('amountField').style.display = state.pay === 'cod' ? 'block' : 'none';
+    render();
+  });
+});
+
+/* ================= COPY / HISTORY ================= */
+el('copyBtn').addEventListener('click', ()=>{
+  const msg = buildMessage();
+  if(!msg.trim()){ return; }
+  navigator.clipboard.writeText(msg).then(()=>{
+    const btn = el('copyBtn');
+    const original = btn.textContent;
+    btn.textContent = 'Скопійовано ✓';
+    btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent = original; btn.classList.remove('copied'); }, 1400);
+  });
+  pushHistory(msg);
+});
+
+document.addEventListener('keydown', (e)=>{
+  if((e.ctrlKey||e.metaKey) && e.key === 'Enter'){ el('copyBtn').click(); }
+});
+
+function pushHistory(msg){
+  const entry = {
+    text: msg,
+    time: new Date().toLocaleString('uk-UA', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})
+  };
+  history.unshift(entry);
+  if(history.length > 30) history = history.slice(0,30);
+  saveLS('np_history', history);
+
+  ['region','district','city','street'].forEach(f=>{
+    const val = el(f).value.trim();
+    if(val && !suggestions[f].includes(val)){
+      suggestions[f].unshift(val);
+      suggestions[f] = suggestions[f].slice(0,25);
+    }
+  });
+  saveLS('np_suggestions', suggestions);
+  renderSuggestions();
+  renderHistory();
+}
+
+function renderSuggestions(){
+  ['region','district','street'].forEach(f=>{
+    const dl = el(f+'List');
+    if(dl) dl.innerHTML = suggestions[f].map(v=>`<option value="${escapeHtml(v)}">`).join('');
+  });
+}
+
+function renderHistory(){
+  const list = el('historyList');
+  if(history.length === 0){
+    list.innerHTML = '<div class="history-empty">Історія порожня — після першого копіювання замовлення з’являться тут</div>';
+    return;
+  }
+  list.innerHTML = history.map((h,i)=>`
+    <div class="history-item">
+      <span class="hi-text">${escapeHtml(h.text.split('\\n')[0])}</span>
+      <span class="hi-time">${escapeHtml(h.time)}</span>
+      <button data-i="${i}" class="hi-copy">копія</button>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.hi-copy').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      navigator.clipboard.writeText(history[btn.dataset.i].text);
+      btn.textContent = '✓';
+      setTimeout(()=>{ btn.textContent = 'копія'; }, 1000);
+    });
+  });
+}
+
+el('clearBtn').addEventListener('click', ()=>{
+  fields.forEach(f => el(f).value = '');
+  el('whSearch').value = '';
+  el('whSearch').disabled = true;
+  el('whSearch').placeholder = 'спочатку виберіть місто';
+  el('cityHint').textContent = '';
+  el('whHint').textContent = '';
+  state.cityRef = null;
+  state.warehouses = [];
+  render();
+});
+
+function tickClock(){
+  const now = new Date();
+  el('clockTime').textContent = now.toLocaleTimeString('uk-UA', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  el('clockDate').textContent = now.toLocaleDateString('uk-UA', {day:'2-digit', month:'long', year:'numeric'});
+}
+tickClock();
+setInterval(tickClock, 1000);
+
+/* ================= NOVA POSHTA API ================= */
+const NP_URL = 'https://api.novaposhta.ua/v2.0/json/';
+
+function setApiStatus(mode, text){
+  const dot = el('apiDot');
+  dot.className = 'dot' + (mode ? ' ' + mode : '');
+  el('apiStatus').textContent = text;
+}
+
+async function npCall(modelName, calledMethod, methodProperties){
+  const res = await fetch(NP_URL, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ apiKey, modelName, calledMethod, methodProperties })
+  });
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+  const json = await res.json();
+  if(!json.success) throw new Error((json.errors && json.errors[0]) || 'Nova Poshta API error');
+  return json.data;
+}
+
+async function npSearchCities(query){
+  const data = await npCall('AddressGeneral', 'searchSettlements', { CityName: query, Limit: 15, Page: 1 });
+  const addresses = (data && data[0] && data[0].Addresses) || [];
+  return addresses.map(a => ({
+    label: a.Present,
+    cityName: a.MainDescription,
+    area: a.Area || '',
+    region: a.Region || '',
+    ref: a.DeliveryCity || a.Ref
+  }));
+}
+
+async function npGetWarehouses(cityRef){
+  if(whCache[cityRef]) return whCache[cityRef];
+  const data = await npCall('AddressGeneral', 'getWarehouses', { CityRef: cityRef, Page: 1, Limit: 500, Language: 'UA' });
+  const list = (data || []).map(w => {
+    let number = w.Number;
+    let addr = w.ShortAddress || '';
+    if(!number){
+      const m = (w.Description||'').match(/№\s*(\d+)/);
+      number = m ? m[1] : '';
+    }
+    if(!addr && w.Description){
+      const parts = w.Description.split(':');
+      addr = parts.length > 1 ? parts.slice(1).join(':').trim() : w.Description;
+    }
+    return {
+      label: w.Description || (`Відділення №${number}: ${addr}`),
+      number, addr,
+      typeDesc: w.TypeOfWarehouse || ''
+    };
+  });
+  whCache[cityRef] = list;
+  return list;
+}
+
+/* ================= GENERIC AUTOCOMPLETE ================= */
+function makeAutocomplete({ inputEl, listEl, fetchFn, renderItem, onSelect, minLen = 2, canSearch = () => true }){
+  let items = [];
+  let hiIndex = -1;
+  let debounceTimer = null;
+  let requestId = 0;
+
+  function close(){
+    listEl.classList.remove('open');
+    listEl.innerHTML = '';
+    hiIndex = -1;
+  }
+
+  function openWith(html){
+    listEl.innerHTML = html;
+    listEl.classList.add('open');
+  }
+
+  function highlight(i){
+    const nodes = listEl.querySelectorAll('.ac-item');
+    nodes.forEach(n => n.classList.remove('hi'));
+    if(nodes[i]){
+      nodes[i].classList.add('hi');
+      nodes[i].scrollIntoView({block:'nearest'});
+    }
+    hiIndex = i;
+  }
+
+  async function runSearch(q){
+    if(q.length < minLen){ close(); return; }
+    openWith('<div class="ac-loading">пошук…</div>');
+    const myId = ++requestId;
+    try{
+      const results = await fetchFn(q);
+      if(myId !== requestId) return; // stale response
+      items = results;
+      if(!items.length){ openWith('<div class="ac-empty">нічого не знайдено</div>'); return; }
+      openWith(items.map((it,i) => `<div class="ac-item" data-i="${i}">${renderItem(it)}</div>`).join(''));
+      listEl.querySelectorAll('.ac-item').forEach(node=>{
+        node.addEventListener('mouseenter', ()=> highlight(+node.dataset.i));
+        node.addEventListener('mousedown', (e)=>{
+          e.preventDefault();
+          select(+node.dataset.i);
+        });
+      });
+      hiIndex = -1;
+    }catch(err){
+      if(myId !== requestId) return;
+      openWith(`<div class="ac-empty">Помилка запиту до Нової пошти: ${escapeHtml(err.message)}</div>`);
+    }
+  }
+
+  function select(i){
+    const item = items[i];
+    if(!item) return;
+    onSelect(item);
+    close();
+  }
+
+  inputEl.addEventListener('input', ()=>{
+    clearTimeout(debounceTimer);
+    if(!canSearch()){ close(); return; }
+    debounceTimer = setTimeout(()=> runSearch(inputEl.value.trim()), 280);
+  });
+
+  inputEl.addEventListener('keydown', (e)=>{
+    if(!listEl.classList.contains('open')) return;
+    if(e.key === 'ArrowDown'){ e.preventDefault(); highlight(Math.min(hiIndex+1, items.length-1)); }
+    else if(e.key === 'ArrowUp'){ e.preventDefault(); highlight(Math.max(hiIndex-1, 0)); }
+    else if(e.key === 'Enter'){ if(hiIndex>=0){ e.preventDefault(); select(hiIndex); } }
+    else if(e.key === 'Escape'){ close(); }
+  });
+
+  document.addEventListener('click', (e)=>{
+    if(!inputEl.contains(e.target) && !listEl.contains(e.target)) close();
+  });
+
+  return { close, runSearch };
+}
+
+// City autocomplete
+makeAutocomplete({
+  inputEl: el('city'),
+  listEl: el('cityAc'),
+  canSearch: () => !!apiKey,
+  fetchFn: npSearchCities,
+  renderItem: (it) => `<div class="ac-main">${escapeHtml(it.label)}</div>`,
+  onSelect: (it) => {
+    el('city').value = it.cityName;
+    el('region').value = it.area;
+    if(it.region) el('district').value = it.region;
+    state.cityRef = it.ref;
+    el('whSearch').disabled = false;
+    el('whSearch').placeholder = 'введіть № відділення або вулицю';
+    el('cityHint').textContent = '✓ з бази Нової пошти';
+    el('whHint').textContent = '';
+    el('whSearch').value = '';
+    el('street').value = '';
+    el('warehouse').value = '';
+    render();
+    el('whSearch').focus();
+  }
+});
+
+// Warehouse autocomplete (loads full list for city once, filters locally)
+makeAutocomplete({
+  inputEl: el('whSearch'),
+  listEl: el('whAc'),
+  minLen: 0,
+  canSearch: () => !!apiKey,
+  fetchFn: async (q) => {
+    if(!state.cityRef) return [];
+    const list = await npGetWarehouses(state.cityRef);
+    state.warehouses = list;
+    const query = q.toLowerCase();
+    if(!query) return list.slice(0, 30);
+    return list.filter(w => w.label.toLowerCase().includes(query)).slice(0, 30);
+  },
+  renderItem: (it) => `<div class="ac-main">Відділення №${escapeHtml(it.number)}</div><div class="ac-meta">${escapeHtml(it.addr)}</div>`,
+  onSelect: (it) => {
+    el('warehouse').value = it.number;
+    el('street').value = it.addr;
+    el('whSearch').value = `Відділення №${it.number}`;
+    el('whHint').textContent = '✓ з бази Нової пошти';
+    render();
+  }
+});
+// allow opening warehouse list on focus even with empty query
+el('whSearch').addEventListener('focus', ()=>{
+  if(!apiKey || !state.cityRef) return;
+  el('whSearch').dispatchEvent(new Event('input'));
+});
+
+/* ================= PROM.UA ================= */
+const PROM_URL = 'http://localhost:8787/prom/products/list';
+let promToken = loadLS('prom_token', '');
+let promCatalog = loadLS('prom_catalog', { products: [], fetchedAt: null });
+
+function setPromStatus(mode, text){
+  const dot = el('promDot');
+  dot.className = 'dot' + (mode ? ' ' + mode : '');
+  el('promStatus').textContent = text;
+}
+
+function refreshPromStatusText(){
+  if(!promToken){ setPromStatus('', 'не підключено — товар вводиться вручну'); return; }
+  if(promCatalog.products.length){
+    setPromStatus('ok', `каталог: ${promCatalog.products.length} товарів (оновлено ${promCatalog.fetchedAt || '—'})`);
+  }else{
+    setPromStatus('', 'токен збережено — натисни «Завантажити каталог»');
+  }
+}
+
+// Prom.ua may return "name" in the shop's default interface language (often ru)
+// even when a separate Ukrainian translation exists on a per-product basis.
+// We try every known place a uk name could live BEFORE falling back to plain "name".
+function extractUkName(p){
+  if(p.name_multilang){
+    if(p.name_multilang.uk) return p.name_multilang.uk;
+    if(p.name_multilang.ua) return p.name_multilang.ua;
+  }
+  if(p.translations){
+    const t = p.translations.uk || p.translations.ua;
+    if(t){
+      if(typeof t === 'string') return t;
+      if(t.name) return t.name;
+    }
+  }
+  if(p.name_uk) return p.name_uk;
+  if(p.name_ua) return p.name_ua;
+  if(p.name_multilang_uk) return p.name_multilang_uk;
+  return p.name || '(без назви)';
+}
+
+async function promFetchAllProducts(){
+  if(!promToken) return;
+  setPromStatus('', 'завантаження каталогу…');
+  const all = [];
+  let lastId = null;
+  const pageLimit = 100;
+  const maxPages = 100; // safety cap ~10 000 товарів
+  try{
+    for(let page = 0; page < maxPages; page++){
+      const url = new URL(PROM_URL);
+      url.searchParams.set('limit', pageLimit);
+      if(lastId) url.searchParams.set('last_id', lastId);
+      const res = await fetch(url.toString(), {
+        headers: { 'Authorization': 'Bearer ' + promToken }
+      });
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const json = await res.json();
+      const batch = json.products || json.data || [];
+      if(!Array.isArray(batch) || batch.length === 0) break;
+      all.push(...batch);
+      setPromStatus('', `завантаження каталогу… ${all.length} товарів`);
+      if(batch.length < pageLimit) break;
+      lastId = batch[batch.length - 1].id;
+    }
+    if(all.length){
+      console.log('[prom debug] приклад товару як його бачить API:', all[0]);
+      console.log('[prom debug] щоб побачити — відкрий консоль браузера (F12 → Console) саме зараз');
+    }
+    promCatalog = {
+      products: all.map(p => ({
+        name: extractUkName(p),
+        sku: p.sku || p.external_id || String(p.id || ''),
+        price: p.price || '',
+        id: p.id
+      })),
+      fetchedAt: new Date().toLocaleString('uk-UA', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})
+    };
+    saveLS('prom_catalog', promCatalog);
+    refreshPromStatusText();
+  }catch(err){
+    const hint = err.message.includes('fetch') ? ' — переконайся, що запущено start-prom-proxy.bat' : '';
+    setPromStatus('err', `помилка завантаження: ${err.message}${hint}`);
+  }
+}
+
+function applyPromToken(token){
+  promToken = token.trim();
+  saveLS('prom_token', promToken);
+  refreshPromStatusText();
+}
+
+el('promSave').addEventListener('click', ()=> applyPromToken(el('promToken').value));
+el('promToken').addEventListener('keydown', (e)=>{ if(e.key==='Enter') applyPromToken(el('promToken').value); });
+el('promLoad').addEventListener('click', promFetchAllProducts);
+
+// Product autocomplete — searches the locally cached Prom catalog (no live search endpoint, so we filter client-side)
+makeAutocomplete({
+  inputEl: el('product'),
+  listEl: el('productAc'),
+  minLen: 2,
+  canSearch: () => promCatalog.products.length > 0,
+  fetchFn: async (q) => {
+    if(!promCatalog.products.length) return [];
+    const query = q.toLowerCase();
+    return promCatalog.products
+      .filter(p => p.name.toLowerCase().includes(query) || (p.sku && String(p.sku).toLowerCase().includes(query)))
+      .slice(0, 30);
+  },
+  renderItem: (it) => `<div class="ac-main">${escapeHtml(it.name)}</div><div class="ac-meta">Артикул: ${escapeHtml(it.sku)}${it.price ? ' · ' + escapeHtml(String(it.price)) + ' грн' : ''}</div>`,
+  onSelect: (it) => {
+    el('product').value = it.name;
+    el('productHint').textContent = `✓ артикул ${it.sku}`;
+    render();
+  }
+});
+function applyApiKey(key){
+  apiKey = key.trim();
+  saveLS('np_api_key', apiKey);
+  if(apiKey){
+    setApiStatus('ok', 'ключ збережено — місто/відділення підвантажуються з бази Нової пошти');
+  }else{
+    setApiStatus('', 'не підключено — місто/відділення вводяться вручну');
+  }
+}
+
+el('apiSave').addEventListener('click', ()=> applyApiKey(el('apiKey').value));
+el('apiKey').addEventListener('keydown', (e)=>{ if(e.key==='Enter') applyApiKey(el('apiKey').value); });
+
+/* ================= INIT ================= */
+el('apiKey').value = apiKey;
+applyApiKey(apiKey);
+el('promToken').value = promToken;
+refreshPromStatusText();
+renderSuggestions();
+renderHistory();
+render();
+</script>
+</body>
+</html>
