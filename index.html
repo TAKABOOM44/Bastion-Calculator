@@ -1310,7 +1310,7 @@ el('whSearch').addEventListener('focus', ()=>{
 });
 
 /* ================= PROM.UA ================= */
-const PROM_URL = 'http://localhost:8787/prom/products/list';
+const PROM_URL = 'http://localhost:8787/prom/api/v1/products/list';
 let promToken = loadLS('prom_token', '');
 let promCatalog = loadLS('prom_catalog', { products: [], fetchedAt: null });
 
