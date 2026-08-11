@@ -77,34 +77,6 @@ html,body{
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-.watermark-col{
-  position:absolute;
-  top:0; bottom:0;
-  width:140px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  overflow:visible;
-}
-.watermark-col.left{ left:-38px; }
-.watermark-col.right{ right:-38px; }
-.watermark-col span{
-  display:inline-block;
-  font-family:'Fraunces', serif;
-  font-weight:700;
-  font-size: clamp(58px, 10vw, 150px);
-  letter-spacing: 14px;
-  color: var(--navy);
-  opacity: 0.055;
-  white-space: nowrap;
-  user-select:none;
-  transform: rotate(-90deg);
-}
-.watermark-col.right span{ transform: rotate(90deg); }
-@media(max-width:900px){
-  .watermark-col{ display:none; }
-}
-
 .wrap{
   position:relative; z-index:1;
   max-width: 1180px;
@@ -501,8 +473,6 @@ h1{
   <div class="grain"></div>
   <div class="glow"></div>
   <div class="glow2"></div>
-  <div class="watermark-col left"><span>БАСТІОН</span></div>
-  <div class="watermark-col right"><span>ДИСПЕТЧЕР</span></div>
 </div>
 
 <div class="wrap">
