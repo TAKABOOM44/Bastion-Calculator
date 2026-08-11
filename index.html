@@ -1763,26 +1763,29 @@ async function pollTelegramUpdates() {
               el('ttn').value = foundTtn;
               el('ttnStatusText').textContent = 'Нова ТТН отримана! Натисни "Перевірити"';
               
-             const savedPromId = history[historyIndex].promOrderId;
+           const savedPromId = history[historyIndex].promOrderId;
               if (savedPromId && savedPromId.length >= 8) {
                 if (promToken) {
-                  const url = `http://localhost:8787/prom/orders/set_status`;
-                  fetch(url, {
+                  fetch('http://localhost:8787/prom/api/v1/orders/set_status', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + promToken },
+                    headers: { 
+                      'Content-Type': 'application/json', 
+                      'Authorization': 'Bearer ' + promToken 
+                    },
                     body: JSON.stringify({ 
-                      status: 'received', 
-                      ids: [parseInt(savedPromId)], 
-                      declaration_id: foundTtn 
-                    })
-                  })
+            status: 'received', 
+            ids: [parseInt(savedPromId)], 
+            declaration_id: foundTtn 
+          })
                   .then(r => {
-                    console.log('Prom.ua оновлено:', r.status);
+                    console.log('Prom.ua оновлено, статус відповіді:', r.status);
                     if(r.ok) {
                       el('ttnStatusText').textContent = 'ТТН передано на Prom.ua ✓';
+                    } else {
+                      r.text().then(errText => console.log('Деталі помилки від Prom:', errText));
                     }
                   })
-                  .catch(e => console.log('Помилка Prom:', e));
+                  .catch(e => console.log('Помилка мережі Prom:', e));
                 }
               }
 
