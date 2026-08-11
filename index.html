@@ -1765,10 +1765,6 @@ async function pollTelegramUpdates() {
               
               const savedPromId = history[historyIndex].promOrderId;
               if (savedPromId && savedPromId.length >= 8) {
-                
-                alert(`ТЕСТ УСПІШНИЙ!\n\nСкрипт зловив ТТН і готовий передати на Prom.ua:\nID замовлення: ${savedPromId}\nТТН: ${foundTtn}\nСтатус: "Прийнято"`);
-                
-                /* 
                 if (promToken) {
                   const url = `http://localhost:8787/prom/orders/set_status`;
                   fetch(url, {
@@ -1777,7 +1773,6 @@ async function pollTelegramUpdates() {
                     body: JSON.stringify({ status: 'received', ids: [parseInt(savedPromId)], declaration_id: foundTtn })
                   }).then(r => console.log('Prom.ua оновлено:', r.status)).catch(e => console.log('Помилка Prom:', e));
                 }
-                */
               }
 
               renderHistory();
