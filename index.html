@@ -226,6 +226,10 @@ h1{
 }
 .apibar button:hover{ background: var(--navy-dim); }
 
+.settings-toggle-row{ margin-bottom:14px; }
+.settings-drawer{ display:none; }
+.settings-drawer.open{ display:block; }
+
 /* ---------- MAIN GRID ---------- */
 .grid{
   display:grid;
@@ -569,6 +573,12 @@ h1{
     </div>
   </header>
 
+  <div class="settings-toggle-row">
+    <button class="btn btn-ghost btn-small" id="settingsToggleBtn" type="button">⚙ Підключення (Нова пошта · Prom.ua · SMS Club · Telegram)</button>
+  </div>
+
+  <div class="settings-drawer" id="settingsDrawer">
+
   <div class="apibar">
     <span class="dot" id="apiDot"></span>
     <label>NP API ключ</label>
@@ -606,6 +616,8 @@ h1{
     <button id="tgSave">Зберегти</button>
     <span class="status-text" id="tgStatus">не підключено — відправка в Telegram вимкнена</span>
     <span class="status-text" style="width:100%; opacity:.75;">⚠ для відправки потрібен локальний проксі — запусти start-telegram-proxy.bat і залиш вікно відкритим</span>
+  </div>
+
   </div>
 
   <div class="grid">
@@ -1701,6 +1713,11 @@ el('tgConfirmOk').addEventListener('click', async () => {
     btn.textContent = original;
     btn.disabled = false;
   }
+});
+
+/* ================= ПАНЕЛЬ ПІДКЛЮЧЕНЬ (ЗГОРТАННЯ) ================= */
+el('settingsToggleBtn').addEventListener('click', () => {
+  el('settingsDrawer').classList.toggle('open');
 });
 
 /* ================= INIT ================= */
