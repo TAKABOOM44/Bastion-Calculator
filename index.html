@@ -1640,20 +1640,50 @@ async function pushTtnToProm(){
   if(!promId) return `<span class="fail">— № замовлення Prom не вказано, статус на Prom.ua не змінено</span>`;
   if(!ttn) return `<span class="fail">— ТТН не вказано, статус на Prom.ua не змінено</span>`;
   if(!promToken) return `<span class="fail">✗ Статус на Prom.ua не змінено — токен Prom.ua не підключено</span>`;
+
+  const lines = [];
+
+  // 1) Зміна статусу замовлення
   try{
     const res = await fetch('http://localhost:8787/prom/api/v1/orders/set_status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + promToken },
-      body: JSON.stringify({ status: 'received', ids: [parseInt(promId)], declaration_id: ttn })
+      body: JSON.stringify({ status: 'received', ids: [parseInt(promId)] })
     });
-    if(res.ok){
-      return `<span class="ok">✓ Статус на Prom.ua змінено, накладна №${escapeHtml(ttn)} відправлена</span>`;
+    const bodyText = await res.text().catch(() => '');
+    let bodyJson = null;
+    try{ bodyJson = JSON.parse(bodyText); }catch(e){}
+    if(res.ok && !(bodyJson && bodyJson.error)){
+      lines.push(`<span class="ok">✓ Статус на Prom.ua змінено на «Прийнято»</span>`);
+    }else{
+      const errMsg = (bodyJson && bodyJson.error) || `HTTP ${res.status}`;
+      lines.push(`<span class="fail">✗ Статус на Prom.ua не змінено — ${escapeHtml(String(errMsg).slice(0,150))}</span>`);
     }
-    const errText = await res.text().catch(() => '');
-    return `<span class="fail">✗ Prom.ua відхилив запит (HTTP ${res.status})${errText ? ' — ' + escapeHtml(errText.slice(0,150)) : ''}</span>`;
   }catch(err){
-    return `<span class="fail">✗ Не вдалося звʼязатися з Prom.ua — ${escapeHtml(err.message)}. Перевір, що запущено start-prom-proxy.bat</span>`;
+    lines.push(`<span class="fail">✗ Не вдалося звʼязатися з Prom.ua (статус) — ${escapeHtml(err.message)}. Перевір, що запущено start-prom-proxy-custom.bat</span>`);
   }
+
+  // 2) Прив'язка номера ТТН (окремий метод API — /delivery/save_declaration_id)
+  try{
+    const res = await fetch('http://localhost:8787/prom/api/v1/delivery/save_declaration_id', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + promToken },
+      body: JSON.stringify({ id: parseInt(promId), declaration_id: ttn })
+    });
+    const bodyText = await res.text().catch(() => '');
+    let bodyJson = null;
+    try{ bodyJson = JSON.parse(bodyText); }catch(e){}
+    if(res.ok && !(bodyJson && bodyJson.error)){
+      lines.push(`<span class="ok">✓ Накладна №${escapeHtml(ttn)} записана в Prom.ua</span>`);
+    }else{
+      const errMsg = (bodyJson && bodyJson.error) || `HTTP ${res.status}`;
+      lines.push(`<span class="fail">✗ Накладну не вдалося записати — ${escapeHtml(String(errMsg).slice(0,150))}</span>`);
+    }
+  }catch(err){
+    lines.push(`<span class="fail">✗ Не вдалося звʼязатися з Prom.ua (накладна) — ${escapeHtml(err.message)}</span>`);
+  }
+
+  return lines.join('<br>');
 }
 
 function attachSmsToLatestHistory(smsId){
