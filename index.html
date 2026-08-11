@@ -1766,7 +1766,7 @@ async function pollTelegramUpdates() {
               const savedPromId = history[historyIndex].promOrderId;
               if (savedPromId && savedPromId.length >= 8) {
                 if (promToken) {
-                  const url = `http://localhost:8787/prom/orders/set_status`;
+                  const url = `http://localhost:8787/prom/api/v1/orders/set_status`;
                   fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + promToken },
