@@ -8,6 +8,10 @@
 <link rel="icon" type="image/png" sizes="192x192" href="favicon-192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="favicon-512.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2c4560">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
@@ -411,14 +415,17 @@ h1{
   background: var(--panel-2);
   border-radius: var(--radius);
   padding: 10px 12px;
-  display:flex; align-items:center; gap:10px;
+  display:flex; flex-direction:column; gap:6px;
   font-size:12px;
 }
-.history-item .hi-text{
+.hi-main{ display:flex; align-items:center; gap:10px; }
+.hi-main .hi-text{
   flex:1; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   font-family:'JetBrains Mono',monospace;
 }
-.history-item .hi-time{ color:var(--text-dim); font-size:10px; flex-shrink:0; font-family:'JetBrains Mono',monospace; }
+.hi-time{ color:var(--text-dim); font-size:10px; flex-shrink:0; font-family:'JetBrains Mono',monospace; }
+.hi-meta{ color:var(--amber-dim); font-size:10.5px; font-family:'JetBrains Mono',monospace; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.hi-actions{ display:flex; justify-content:flex-end; }
 .history-item button{
   background:none; border:1px solid var(--line-strong); color:var(--text-dim);
   border-radius:2px; padding:5px 8px; font-size:10px; cursor:pointer; font-family:'Manrope',sans-serif; font-weight:600;
@@ -440,6 +447,26 @@ h1{
 .field select:focus{ outline:none; border-color: var(--navy-dim); }
 
 .sms-panel{ margin-top:22px; }
+
+.status-text{ color:var(--text-dim); font-size:11px; }
+.ttn-status-row{ display:flex; align-items:center; gap:8px; height:38px; }
+.ttn-status-row .status-text{ font-family:'JetBrains Mono',monospace; }
+.btn-small{ padding:9px 10px; font-size:10px; flex-shrink:0; }
+
+.backup-hint{ font-size:11.5px; color:var(--text-dim); margin:0 0 12px; line-height:1.5; }
+
+.history-search{
+  width:100%; margin-bottom:10px;
+  background: var(--bg-soft); border:1px solid var(--line); border-radius:var(--radius);
+  padding:9px 10px; font-family:'JetBrains Mono',monospace; font-size:12.5px; color:var(--text);
+}
+.history-search:focus{ outline:none; border-color:var(--navy-dim); }
+.history-stats{
+  display:flex; gap:18px; flex-wrap:wrap; margin-bottom:12px; font-size:11px; color:var(--text-dim);
+}
+.history-stats b{ color:var(--navy); font-family:'JetBrains Mono',monospace; font-weight:600; }
+
+.field input.field-invalid{ border-color: var(--red); }
 
 /* ---------- MODAL ---------- */
 .modal-overlay{
@@ -652,7 +679,9 @@ h1{
   </div>
 
   <div class="history panel">
-    <div class="panel-title">Історія замовлень (останні 30)</div>
+    <div class="panel-title">Історія замовлень</div>
+    <div class="history-stats" id="historyStats"></div>
+    <input class="history-search" id="historySearch" placeholder="Пошук за телефоном, ПІБ або номером ТТН…" autocomplete="off">
     <div class="history-list" id="historyList"></div>
   </div>
 
@@ -663,9 +692,26 @@ h1{
         <label>№ ТТН (Нова пошта)</label>
         <input id="ttn" placeholder="20450123456789">
       </div>
+      <div class="field">
+        <label>Статус ТТН</label>
+        <div class="ttn-status-row">
+          <span class="status-text" id="ttnStatusText">—</span>
+          <button class="btn btn-ghost btn-small" id="ttnCheckBtn" type="button">Перевірити</button>
+        </div>
+      </div>
     </div>
     <div class="actions">
       <button class="btn btn-primary" id="sendSmsBtn">Відправити SMS</button>
+    </div>
+  </div>
+
+  <div class="panel sms-panel backup-panel">
+    <div class="panel-title">Резервна копія даних</div>
+    <p class="backup-hint">Історія, токени та налаштування зберігаються лише в цьому браузері. Раз на тиждень варто зробити експорт — так нічого не загубиться при очищенні кешу чи переході на інший компʼютер.</p>
+    <div class="actions">
+      <button class="btn btn-ghost" id="exportDataBtn" type="button">Експорт даних</button>
+      <button class="btn btn-ghost" id="importDataBtnLabel" type="button">Імпортувати дані</button>
+      <input type="file" id="importDataInput" accept="application/json" style="display:none;">
     </div>
   </div>
 
@@ -786,6 +832,17 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
 
+/* ================= ТЕЛЕФОН: МАСКА ================= */
+el('phone').addEventListener('input', (e)=>{
+  const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+  let out = digits.slice(0, 3);
+  if(digits.length > 3) out += ' ' + digits.slice(3, 6);
+  if(digits.length > 6) out += ' ' + digits.slice(6, 8);
+  if(digits.length > 8) out += ' ' + digits.slice(8, 10);
+  e.target.value = out;
+  e.target.classList.toggle('field-invalid', digits.length > 0 && digits.length < 10);
+});
+
 fields.forEach(f => el(f).addEventListener('input', render));
 
 /* ================= PAY TOGGLE ================= */
@@ -820,7 +877,15 @@ document.addEventListener('keydown', (e)=>{
 function pushHistory(msg){
   const entry = {
     text: msg,
-    time: new Date().toLocaleString('uk-UA', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})
+    time: new Date().toLocaleString('uk-UA', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}),
+    ts: Date.now(),
+    phone: el('phone').value.trim(),
+    fullname: el('fullname').value.trim(),
+    amount: state.pay === 'cod' ? (parseFloat(el('amount').value) || 0) : 0,
+    pay: state.pay,
+    ttn: '',
+    smsId: '',
+    smsStatus: ''
   };
   history.unshift(entry);
   if(history.length > 30) history = history.slice(0,30);
@@ -845,19 +910,68 @@ function renderSuggestions(){
   });
 }
 
+let historySearchQuery = '';
+el('historySearch').addEventListener('input', ()=>{
+  historySearchQuery = el('historySearch').value.trim().toLowerCase();
+  renderHistory();
+});
+
+function updateHistoryStats(){
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfWeek = startOfToday - (((now.getDay() + 6) % 7) * 86400000);
+  let todayCount = 0, weekCount = 0, todaySum = 0, weekSum = 0;
+  history.forEach(h => {
+    const ts = h.ts || 0;
+    const amount = h.amount || 0;
+    if(ts >= startOfToday){ todayCount++; todaySum += amount; }
+    if(ts >= startOfWeek){ weekCount++; weekSum += amount; }
+  });
+  el('historyStats').innerHTML = history.length
+    ? `<span>Сьогодні: <b>${todayCount}</b> замовл. · <b>${todaySum.toLocaleString('uk-UA')}</b> ₴</span>` +
+      `<span>За тиждень: <b>${weekCount}</b> замовл. · <b>${weekSum.toLocaleString('uk-UA')}</b> ₴</span>`
+    : '';
+}
+
 function renderHistory(){
   const list = el('historyList');
+  updateHistoryStats();
+
   if(history.length === 0){
     list.innerHTML = '<div class="history-empty">Історія порожня — після першого копіювання замовлення з’являться тут</div>';
     return;
   }
-  list.innerHTML = history.map((h,i)=>`
+
+  const filtered = historySearchQuery
+    ? history.filter(h => [h.text, h.phone, h.fullname, h.ttn].filter(Boolean).join(' ').toLowerCase().includes(historySearchQuery))
+    : history;
+
+  if(filtered.length === 0){
+    list.innerHTML = '<div class="history-empty">Нічого не знайдено за запитом</div>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(h => {
+    const i = history.indexOf(h);
+    const metaParts = [];
+    if(h.ttn) metaParts.push(`ТТН: ${escapeHtml(h.ttn)}`);
+    if(h.smsStatus) metaParts.push(`SMS: ${escapeHtml(h.smsStatus)}`);
+    const metaLine = metaParts.length
+      ? `<div class="hi-meta">${metaParts.join(' · ')}${h.smsId ? `<button data-i="${i}" class="hi-check-sms">оновити SMS</button>` : ''}</div>`
+      : '';
+    return `
     <div class="history-item">
-      <span class="hi-text">${escapeHtml(h.text.split('\\n')[0])}</span>
-      <span class="hi-time">${escapeHtml(h.time)}</span>
-      <button data-i="${i}" class="hi-copy">копія</button>
+      <div class="hi-main">
+        <span class="hi-text">${escapeHtml(h.text.split('\\n')[0])}</span>
+        <span class="hi-time">${escapeHtml(h.time)}</span>
+      </div>
+      ${metaLine}
+      <div class="hi-actions">
+        <button data-i="${i}" class="hi-copy">копія</button>
+      </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   list.querySelectorAll('.hi-copy').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -865,6 +979,9 @@ function renderHistory(){
       btn.textContent = '✓';
       setTimeout(()=>{ btn.textContent = 'копія'; }, 1000);
     });
+  });
+  list.querySelectorAll('.hi-check-sms').forEach(btn=>{
+    btn.addEventListener('click', ()=> checkSmsStatusForHistory(+btn.dataset.i));
   });
 }
 
@@ -876,10 +993,67 @@ el('clearBtn').addEventListener('click', ()=>{
   el('cityHint').textContent = '';
   el('whHint').textContent = '';
   el('ttn').value = '';
+  el('ttnStatusText').textContent = '—';
   state.cityRef = null;
   state.warehouses = [];
   render();
 });
+
+/* ================= РЕЗЕРВНА КОПІЯ ДАНИХ ================= */
+const BACKUP_KEYS = ['np_history','np_suggestions','np_api_key','prom_token','prom_catalog','smsclub_token','smsclub_alpha_list','smsclub_alpha_selected'];
+
+function exportData(){
+  const payload = { version: 1, exportedAt: new Date().toISOString() };
+  BACKUP_KEYS.forEach(key => { payload[key] = loadLS(key, null); });
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `bastion-backup-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importData(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const data = JSON.parse(reader.result);
+      BACKUP_KEYS.forEach(key => { if(data[key] !== undefined && data[key] !== null) saveLS(key, data[key]); });
+      alert('Дані імпортовано. Сторінка перезавантажиться.');
+      location.reload();
+    }catch(err){
+      alert('Помилка імпорту: файл не є коректним backup JSON.');
+    }
+  };
+  reader.readAsText(file);
+}
+
+el('exportDataBtn').addEventListener('click', exportData);
+el('importDataBtnLabel').addEventListener('click', () => el('importDataInput').click());
+el('importDataInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if(file) importData(file);
+});
+
+/* ================= СТАТУС ТТН (НОВА ПОШТА) ================= */
+el('ttnCheckBtn').addEventListener('click', checkTtnStatus);
+async function checkTtnStatus(){
+  const ttn = el('ttn').value.trim();
+  if(!ttn){ el('ttnStatusText').textContent = 'вкажи номер ТТН'; return; }
+  if(!apiKey){ el('ttnStatusText').textContent = 'немає ключа Нової пошти'; return; }
+  el('ttnStatusText').textContent = 'перевірка…';
+  try{
+    const phoneDigits = el('phone').value.replace(/\D/g, '');
+    const data = await npCall('InternetDocument', 'getStatusDocuments', { Documents: [{ DocumentNumber: ttn, Phone: phoneDigits }] });
+    const doc = data && data[0];
+    el('ttnStatusText').textContent = doc ? (doc.StatusDescription || doc.Status || 'статус отримано') : 'ТТН не знайдено';
+  }catch(err){
+    el('ttnStatusText').textContent = 'помилка: ' + err.message;
+  }
+}
 
 function tickClock(){
   const now = new Date();
@@ -1376,7 +1550,9 @@ el('smsConfirmOk').addEventListener('click', async () => {
   btn.textContent = 'Відправка…';
   btn.disabled = true;
   try{
-    await smsclubCall('/send', { phone: [phone], message: text, src_addr: smsSelectedAlpha });
+    const info = await smsclubCall('/send', { phone: [phone], message: text, src_addr: smsSelectedAlpha });
+    const smsId = info ? Object.keys(info)[0] : '';
+    attachSmsToLatestHistory(smsId);
     closeSmsConfirm();
     closeSmsModal();
     const sendBtn = el('sendSmsBtn');
@@ -1394,6 +1570,34 @@ el('smsConfirmOk').addEventListener('click', async () => {
   }
 });
 
+/* ---- Прив'язка SMS до історії + перевірка статусу доставки ---- */
+function attachSmsToLatestHistory(smsId){
+  if(!history.length) return;
+  history[0].ttn = el('ttn').value.trim();
+  if(smsId){
+    history[0].smsId = smsId;
+    history[0].smsStatus = 'ENROUTE';
+  }
+  saveLS('np_history', history);
+  renderHistory();
+}
+
+async function checkSmsStatusForHistory(index){
+  const h = history[index];
+  if(!h || !h.smsId) return;
+  try{
+    const info = await smsclubCall('/status', { id_sms: [h.smsId] });
+    const status = info && info[h.smsId];
+    if(status){
+      h.smsStatus = status;
+      saveLS('np_history', history);
+      renderHistory();
+    }
+  }catch(err){
+    alert('Помилка перевірки статусу SMS: ' + err.message);
+  }
+}
+
 /* ================= INIT ================= */
 el('apiKey').value = apiKey;
 applyApiKey(apiKey);
@@ -1404,6 +1608,12 @@ refreshSmsclubStatusText();
 renderSuggestions();
 renderHistory();
 render();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
 </script>
 </body>
 </html>
