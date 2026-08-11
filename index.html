@@ -457,6 +457,9 @@ h1{
 .field select:focus{ outline:none; border-color: var(--navy-dim); }
 
 .sms-panel{ margin-top:22px; }
+.action-result{ margin-top:10px; font-size:12.5px; line-height:1.7; }
+.action-result .ok{ color: var(--green); }
+.action-result .fail{ color: var(--red); }
 
 .status-text{ color:var(--text-dim); font-size:11px; }
 .ttn-status-row{ display:flex; align-items:center; gap:8px; height:38px; }
@@ -738,6 +741,7 @@ h1{
     <div class="actions">
       <button class="btn btn-primary" id="sendSmsBtn">Відправити SMS</button>
     </div>
+    <div class="action-result" id="actionResult"></div>
   </div>
 
   <div class="panel sms-panel backup-panel">
@@ -1593,25 +1597,60 @@ el('smsConfirmOk').addEventListener('click', async () => {
   const original = btn.textContent;
   btn.textContent = 'Відправка…';
   btn.disabled = true;
+
+  let smsResultLine;
   try{
     const info = await smsclubCall('/send', { phone: [phone], message: text, src_addr: smsSelectedAlpha });
     const smsId = info ? Object.keys(info)[0] : '';
     attachSmsToLatestHistory(smsId);
-    closeSmsConfirm();
-    closeSmsModal();
-    const sendBtn = el('sendSmsBtn');
-    const orig2 = sendBtn.textContent;
-    sendBtn.textContent = 'SMS відправлено ✓';
-    sendBtn.classList.add('copied');
-    setTimeout(() => { sendBtn.textContent = orig2; sendBtn.classList.remove('copied'); }, 1800);
+    smsResultLine = `<span class="ok">✓ SMS відправлено клієнту</span>`;
   }catch(err){
-    closeSmsConfirm();
-    el('smsModalError').textContent = 'Помилка відправки: ' + err.message;
-  }finally{
-    btn.textContent = original;
-    btn.disabled = false;
+    smsResultLine = `<span class="fail">✗ SMS не відправлено — ${escapeHtml(err.message)}. Перевір токен SMS Club у налаштуваннях.</span>`;
   }
+
+  const promResultLine = await pushTtnToProm();
+
+  closeSmsConfirm();
+  closeSmsModal();
+
+  const sendBtn = el('sendSmsBtn');
+  const orig2 = sendBtn.textContent;
+  sendBtn.textContent = 'Готово';
+  sendBtn.classList.add('copied');
+  setTimeout(() => { sendBtn.textContent = orig2; sendBtn.classList.remove('copied'); }, 1800);
+
+  el('actionResult').innerHTML = smsResultLine + '<br>' + promResultLine;
+  clearTimeout(actionResultTimer);
+  actionResultTimer = setTimeout(() => { el('actionResult').innerHTML = ''; }, 10000);
+
+  btn.textContent = original;
+  btn.disabled = false;
 });
+
+let actionResultTimer = null;
+
+/* ---- Оновлення статусу+ТТН на Prom.ua (викликається разом із SMS, тому потрібен окремий клік для запуску) ---- */
+async function pushTtnToProm(){
+  const ttn = el('ttn').value.trim();
+  const promId = el('promOrderId').value.trim();
+  if(!promId) return `<span class="fail">— № замовлення Prom не вказано, статус на Prom.ua не змінено</span>`;
+  if(!ttn) return `<span class="fail">— ТТН не вказано, статус на Prom.ua не змінено</span>`;
+  if(!promToken) return `<span class="fail">✗ Статус на Prom.ua не змінено — токен Prom.ua не підключено</span>`;
+  try{
+    const res = await fetch('http://localhost:8787/prom/api/v1/orders/set_status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + promToken },
+      body: JSON.stringify({ status: 'received', ids: [parseInt(promId)], declaration_id: ttn })
+    });
+    if(res.ok){
+      return `<span class="ok">✓ Статус на Prom.ua змінено, накладна №${escapeHtml(ttn)} відправлена</span>`;
+    }
+    const errText = await res.text().catch(() => '');
+    return `<span class="fail">✗ Prom.ua відхилив запит (HTTP ${res.status})${errText ? ' — ' + escapeHtml(errText.slice(0,150)) : ''}</span>`;
+  }catch(err){
+    return `<span class="fail">✗ Не вдалося звʼязатися з Prom.ua — ${escapeHtml(err.message)}. Перевір, що запущено start-prom-proxy.bat</span>`;
+  }
+}
 
 function attachSmsToLatestHistory(smsId){
   if(!history.length) return;
@@ -1724,7 +1763,7 @@ async function pollTelegramUpdates() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ offset: tgLastUpdateId + 1, timeout: 10 })
     });
-    
+
     const json = await res.json();
     if (!json.ok || !json.result || json.result.length === 0) return;
 
@@ -1736,60 +1775,38 @@ async function pollTelegramUpdates() {
 
       const msg = update.message;
       if (msg && String(msg.chat.id) === tgChatId && msg.reply_to_message) {
-        
+
         if (String(msg.reply_to_message.from.id) === botId) {
-          
+
           const ttnMatch = msg.text ? msg.text.match(/\b(20|59)\d{12}\b/) : null;
-          
+
           if (ttnMatch) {
             const foundTtn = ttnMatch[0];
             const originalText = msg.reply_to_message.text;
 
-            const historyIndex = history.findIndex(h => originalText.includes(h.text.split('\n')[0]));
-            
+            // Спочатку шукаємо точний збіг тексту (надійно), і лише якщо не знайшли —
+            // м'який пошук за першим рядком (назвою товару), щоб не прив'язати ТТН до чужого замовлення.
+            let historyIndex = history.findIndex(h => h.text === originalText);
+            if(historyIndex === -1){
+              historyIndex = history.findIndex(h => originalText.includes(h.text.split('\n')[0]));
+            }
+
             if (historyIndex !== -1) {
               history[historyIndex].ttn = foundTtn;
               saveLS('np_history', history);
-              
-              renderHistory();
-              
-              el('ttn').value = foundTtn;
-              el('ttnStatusText').textContent = 'Нова ТТН отримана!';
 
-              // БОЕВАЯ ОТПРАВКА НА PROM.UA АВТОМАТИЧЕСКИ
-              const savedPromId = history[historyIndex].promOrderId;
-              if (savedPromId && savedPromId.length >= 8) {
-                if (promToken) {
-                  fetch('http://localhost:8787/prom/api/v1/orders/set_status', {
-                    method: 'PUT',
-                    headers: { 
-                      'Content-Type': 'application/json', 
-                      'Authorization': 'Bearer ' + promToken 
-                    },
-                    body: JSON.stringify({ 
-                      status: 'received', 
-                      ids: [parseInt(savedPromId)], 
-                      declaration_id: foundTtn 
-                    })
-                  })
-                  .then(r => {
-                    console.log('Prom.ua оновлено, статус відповіді:', r.status);
-                    if(r.ok) {
-                      el('ttnStatusText').textContent = 'ТТН передано на Prom.ua ✓';
-                    } else {
-                      r.text().then(errText => console.log('Деталі помилки від Prom:', errText));
-                    }
-                  })
-                  .catch(e => console.log('Помилка мережі Prom:', e));
-                }
-              }
+              renderHistory();
+
+              el('ttn').value = foundTtn;
+              el('ttnStatusText').textContent = 'ТТН отримано з Telegram — натисни «Відправити SMS», щоб повідомити клієнта і оновити статус на Prom.ua';
             }
           }
         }
       }
     }
+    refreshTgStatusText();
   } catch (err) {
-    console.log('Помилка getUpdates:', err.message);
+    setTgStatus('', 'помилка опитування Telegram: ' + err.message);
   }
 }
 
