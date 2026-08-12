@@ -666,17 +666,10 @@ h1{
         </div>
       </div>
 
-      <div class="field-row">
-        <div class="field">
-          <label>Район <span class="hint">(необов'язково)</span></label>
-          <input id="district" list="districtList" placeholder="Запорізький">
-          <datalist id="districtList"></datalist>
-        </div>
-        <div class="field">
-          <label>Відділення Нової пошти <span class="hint" id="whHint"></span></label>
-          <input id="whSearch" placeholder="спочатку виберіть місто" autocomplete="off" disabled>
-          <div class="ac-list" id="whAc"></div>
-        </div>
+      <div class="field">
+        <label>Відділення Нової пошти <span class="hint" id="whHint"></span></label>
+        <input id="whSearch" placeholder="спочатку виберіть місто" autocomplete="off" disabled>
+        <div class="ac-list" id="whAc"></div>
       </div>
 
       <div class="field-row">
@@ -829,7 +822,7 @@ h1{
 </div>
 
 <script>
-const fields = ['product','size','region','district','city','street','warehouse','phone','fullname','amount','promOrderId'];
+const fields = ['product','size','region','city','street','warehouse','phone','fullname','amount','promOrderId'];
 const state = { pay: 'cod', cityRef: null, warehouses: [] };
 
 const el = id => document.getElementById(id);
@@ -840,7 +833,7 @@ function loadLS(key, fallback){
 function saveLS(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
 
 let history = loadLS('np_history', []);
-let suggestions = loadLS('np_suggestions', { region:[], district:[], city:[], street:[] });
+let suggestions = loadLS('np_suggestions', { region:[], city:[], street:[] });
 let apiKey = loadLS('np_api_key', '');
 let whCache = {};
 
@@ -852,10 +845,9 @@ function buildMessage(){
   if(v('product')) lines.push(v('product'));
   if(v('size')) lines.push(`розмір ${v('size')}`);
 
-  const region = v('region'), district = v('district'), city = v('city');
-  if(city || region || district){
+  const region = v('region'), city = v('city');
+  if(city || region){
     let loc = city ? `місто ${city}` : 'місто —';
-    if(district) loc += `, ${district} район`;
     if(region) loc += `, ${region} область`;
     lines.push(loc);
   }
@@ -950,7 +942,7 @@ function pushHistory(msg){
   if(history.length > 30) history = history.slice(0,30);
   saveLS('np_history', history);
 
-  ['region','district','city','street'].forEach(f=>{
+  ['region','city','street'].forEach(f=>{
     const val = el(f).value.trim();
     if(val && !suggestions[f].includes(val)){
       suggestions[f].unshift(val);
@@ -963,7 +955,7 @@ function pushHistory(msg){
 }
 
 function renderSuggestions(){
-  ['region','district','street'].forEach(f=>{
+  ['region','street'].forEach(f=>{
     const dl = el(f+'List');
     if(dl) dl.innerHTML = suggestions[f].map(v=>`<option value="${escapeHtml(v)}">`).join('');
   });
@@ -1385,7 +1377,6 @@ makeAutocomplete({
   onSelect: (it) => {
     el('city').value = it.cityName;
     el('region').value = it.area;
-    if(it.region) el('district').value = it.region;
     state.cityRef = it.ref;
     el('whSearch').disabled = false;
     el('whSearch').placeholder = 'введіть № відділення або вулицю';
