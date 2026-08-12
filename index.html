@@ -226,7 +226,7 @@ h1{
 }
 .apibar button:hover{ background: var(--navy-dim); }
 
-.settings-toggle-row{ margin-bottom:14px; }
+.settings-toggle-row{ margin-bottom:14px; display:flex; gap:10px; flex-wrap:wrap; }
 .settings-drawer{ display:none; }
 .settings-drawer.open{ display:block; }
 
@@ -578,6 +578,7 @@ h1{
 
   <div class="settings-toggle-row">
     <button class="btn btn-ghost btn-small" id="settingsToggleBtn" type="button">⚙ Підключення (Нова пошта · Prom.ua · SMS Club · Telegram)</button>
+    <button class="btn btn-ghost btn-small" id="historyToggleBtn" type="button">📋 Історія та резервна копія</button>
   </div>
 
   <div class="settings-drawer" id="settingsDrawer">
@@ -706,15 +707,8 @@ h1{
     </div>
   </div>
 
-  <div class="history panel">
-    <div class="panel-title">Історія замовлень</div>
-    <div class="history-stats" id="historyStats"></div>
-    <input class="history-search" id="historySearch" placeholder="Пошук за телефоном, ПІБ або номером ТТН…" autocomplete="off">
-    <div class="history-list" id="historyList"></div>
-  </div>
-
   <div class="panel sms-panel">
-    <div class="panel-title">Відправка SMS клієнту</div>
+    <div class="panel-title">Фіналізація замовлення</div>
     <div class="field-row">
       <div class="field">
         <label>№ ТТН (Нова пошта)</label>
@@ -729,9 +723,19 @@ h1{
       </div>
     </div>
     <div class="actions">
-      <button class="btn btn-primary" id="sendSmsBtn">Відправити SMS</button>
+      <button class="btn btn-primary" id="sendSmsBtn">✅ Фіналізувати замовлення</button>
     </div>
+    <p class="backup-hint">Одна кнопка — SMS клієнту з номером ТТН, зміна статусу на Prom.ua і запис накладної.</p>
     <div class="action-result" id="actionResult"></div>
+  </div>
+
+  <div class="settings-drawer" id="historyDrawer">
+
+  <div class="history panel">
+    <div class="panel-title">Історія замовлень</div>
+    <div class="history-stats" id="historyStats"></div>
+    <input class="history-search" id="historySearch" placeholder="Пошук за телефоном, ПІБ або номером ТТН…" autocomplete="off">
+    <div class="history-list" id="historyList"></div>
   </div>
 
   <div class="panel sms-panel backup-panel">
@@ -742,6 +746,8 @@ h1{
       <button class="btn btn-ghost" id="importDataBtnLabel" type="button">Імпортувати дані</button>
       <input type="file" id="importDataInput" accept="application/json" style="display:none;">
     </div>
+  </div>
+
   </div>
 
 </div>
@@ -789,7 +795,7 @@ h1{
       <h3>Підтвердження</h3>
     </div>
     <div class="modal-body">
-      <p style="margin:0 0 4px;">Відправити SMS на номер <strong id="smsConfirmPhone"></strong>?</p>
+      <p style="margin:0 0 4px;">Фіналізувати замовлення — відправити SMS на номер <strong id="smsConfirmPhone"></strong> і оновити статус+накладну на Prom.ua?</p>
       <div class="sms-confirm-preview" id="smsConfirmPreview"></div>
     </div>
     <div class="modal-actions">
@@ -1977,6 +1983,9 @@ setInterval(pollTelegramUpdates, 15000);
 
 el('settingsToggleBtn').addEventListener('click', () => {
   el('settingsDrawer').classList.toggle('open');
+});
+el('historyToggleBtn').addEventListener('click', () => {
+  el('historyDrawer').classList.toggle('open');
 });
 
 /* ================= INIT ================= */
