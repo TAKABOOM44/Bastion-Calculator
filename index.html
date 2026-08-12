@@ -227,8 +227,6 @@ h1{
 .apibar button:hover{ background: var(--navy-dim); }
 
 .settings-toggle-row{ margin-bottom:14px; display:flex; gap:10px; flex-wrap:wrap; }
-.settings-drawer{ display:none; }
-.settings-drawer.open{ display:block; }
 
 /* ---------- MAIN GRID ---------- */
 .grid{
@@ -498,6 +496,7 @@ h1{
   max-height: 90vh; overflow-y:auto;
 }
 .modal-box-small{ max-width: 380px; }
+.modal-box-wide{ max-width: 720px; }
 .modal-header{
   display:flex; align-items:center; justify-content:space-between;
   padding: 16px 18px 12px;
@@ -592,49 +591,6 @@ h1{
   <div class="settings-toggle-row">
     <button class="btn btn-ghost btn-small" id="settingsToggleBtn" type="button">⚙ Підключення (Нова пошта · Prom.ua · SMS Club · Telegram)</button>
     <button class="btn btn-ghost btn-small" id="historyToggleBtn" type="button">📋 Історія та резервна копія</button>
-  </div>
-
-  <div class="settings-drawer" id="settingsDrawer">
-
-  <div class="apibar">
-    <span class="dot" id="apiDot"></span>
-    <label>NP API ключ</label>
-    <input id="apiKey" type="text" placeholder="встав сюди ключ з кабінету Нової пошти" autocomplete="off">
-    <button id="apiSave">Зберегти</button>
-    <span class="status-text" id="apiStatus">не підключено — місто/відділення вводяться вручну</span>
-    <a href="https://new.novaposhta.ua/dashboard" target="_blank" rel="noopener">де взяти ключ →</a>
-  </div>
-
-  <div class="apibar">
-    <span class="dot" id="promDot"></span>
-    <label>Prom.ua токен</label>
-    <input id="promToken" type="text" placeholder="встав сюди токен з кабінету Prom.ua" autocomplete="off">
-    <button id="promSave">Зберегти</button>
-    <button id="promLoad">Завантажити каталог</button>
-    <span class="status-text" id="promStatus">не підключено — товар вводиться вручну</span>
-    <a href="https://my.prom.ua/cms/settings/public_api_tokens" target="_blank" rel="noopener">де взяти токен →</a>
-    <span class="status-text" style="width:100%; opacity:.75;">⚠ перед завантаженням каталогу запусти start-prom-proxy.bat і залиш вікно відкритим</span>
-  </div>
-
-  <div class="apibar">
-    <span class="dot" id="smsclubDot"></span>
-    <label>SMS Club токен</label>
-    <input id="smsclubToken" type="text" placeholder="встав сюди токен з кабінету SMS Club" autocomplete="off">
-    <button id="smsclubSave">Зберегти</button>
-    <span class="status-text" id="smsclubStatus">не підключено — SMS не відправляються</span>
-    <a href="https://my.smsclub.mobi/en/profile" target="_blank" rel="noopener">де взяти токен →</a>
-  </div>
-
-  <div class="apibar">
-    <span class="dot" id="tgDot"></span>
-    <label>Telegram бот</label>
-    <input id="tgToken" type="text" placeholder="токен бота від @BotFather" autocomplete="off">
-    <input id="tgChatId" type="text" placeholder="chat_id групи (напр. -100123456789)" autocomplete="off" style="max-width:220px;">
-    <button id="tgSave">Зберегти</button>
-    <span class="status-text" id="tgStatus">не підключено — відправка в Telegram вимкнена</span>
-    <span class="status-text" style="width:100%; opacity:.75;">⚠ для відправки потрібен локальний проксі — запусти start-telegram-proxy.bat і залиш вікно відкритим</span>
-  </div>
-
   </div>
 
   <div class="grid">
@@ -742,27 +698,6 @@ h1{
     <div class="action-result" id="actionResult"></div>
   </div>
 
-  <div class="settings-drawer" id="historyDrawer">
-
-  <div class="history panel">
-    <div class="panel-title">Історія замовлень</div>
-    <div class="history-stats" id="historyStats"></div>
-    <input class="history-search" id="historySearch" placeholder="Пошук за телефоном, ПІБ або номером ТТН…" autocomplete="off">
-    <div class="history-list" id="historyList"></div>
-  </div>
-
-  <div class="panel sms-panel backup-panel">
-    <div class="panel-title">Резервна копія даних</div>
-    <p class="backup-hint">Історія, токени та налаштування зберігаються лише в цьому браузері. Раз на тиждень варто зробити експорт — так нічого не загубиться при очищенні кешу чи переході на інший компʼютер.</p>
-    <div class="actions">
-      <button class="btn btn-ghost" id="exportDataBtn" type="button">Експорт даних</button>
-      <button class="btn btn-ghost" id="importDataBtnLabel" type="button">Імпортувати дані</button>
-      <input type="file" id="importDataInput" accept="application/json" style="display:none;">
-    </div>
-  </div>
-
-  </div>
-
 </div>
 
 <div class="modal-overlay" id="smsModalOverlay">
@@ -836,6 +771,86 @@ h1{
     <div class="modal-actions">
       <button class="btn btn-ghost" id="tgConfirmCancel">Скасувати</button>
       <button class="btn btn-primary" id="tgConfirmOk">Підтвердити</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="settingsModalOverlay">
+  <div class="modal-box modal-box-wide">
+    <div class="modal-header">
+      <h3>⚙ Підключення</h3>
+      <button class="modal-close" id="settingsModalClose">×</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="apibar">
+        <span class="dot" id="apiDot"></span>
+        <label>NP API ключ</label>
+        <input id="apiKey" type="text" placeholder="встав сюди ключ з кабінету Нової пошти" autocomplete="off">
+        <button id="apiSave">Зберегти</button>
+        <span class="status-text" id="apiStatus">не підключено — місто/відділення вводяться вручну</span>
+        <a href="https://new.novaposhta.ua/dashboard" target="_blank" rel="noopener">де взяти ключ →</a>
+      </div>
+
+      <div class="apibar">
+        <span class="dot" id="promDot"></span>
+        <label>Prom.ua токен</label>
+        <input id="promToken" type="text" placeholder="встав сюди токен з кабінету Prom.ua" autocomplete="off">
+        <button id="promSave">Зберегти</button>
+        <button id="promLoad">Завантажити каталог</button>
+        <span class="status-text" id="promStatus">не підключено — товар вводиться вручну</span>
+        <a href="https://my.prom.ua/cms/settings/public_api_tokens" target="_blank" rel="noopener">де взяти токен →</a>
+        <span class="status-text" style="width:100%; opacity:.75;">⚠ перед завантаженням каталогу запусти start-prom-proxy.bat і залиш вікно відкритим</span>
+      </div>
+
+      <div class="apibar">
+        <span class="dot" id="smsclubDot"></span>
+        <label>SMS Club токен</label>
+        <input id="smsclubToken" type="text" placeholder="встав сюди токен з кабінету SMS Club" autocomplete="off">
+        <button id="smsclubSave">Зберегти</button>
+        <span class="status-text" id="smsclubStatus">не підключено — SMS не відправляються</span>
+        <a href="https://my.smsclub.mobi/en/profile" target="_blank" rel="noopener">де взяти токен →</a>
+      </div>
+
+      <div class="apibar">
+        <span class="dot" id="tgDot"></span>
+        <label>Telegram бот</label>
+        <input id="tgToken" type="text" placeholder="токен бота від @BotFather" autocomplete="off">
+        <input id="tgChatId" type="text" placeholder="chat_id групи (напр. -100123456789)" autocomplete="off" style="max-width:220px;">
+        <button id="tgSave">Зберегти</button>
+        <span class="status-text" id="tgStatus">не підключено — відправка в Telegram вимкнена</span>
+        <span class="status-text" style="width:100%; opacity:.75;">⚠ для відправки потрібен локальний проксі — запусти start-telegram-proxy.bat і залиш вікно відкритим</span>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="historyModalOverlay">
+  <div class="modal-box modal-box-wide">
+    <div class="modal-header">
+      <h3>📋 Історія та резервна копія</h3>
+      <button class="modal-close" id="historyModalClose">×</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="history panel">
+        <div class="panel-title">Історія замовлень</div>
+        <div class="history-stats" id="historyStats"></div>
+        <input class="history-search" id="historySearch" placeholder="Пошук за телефоном, ПІБ або номером ТТН…" autocomplete="off">
+        <div class="history-list" id="historyList"></div>
+      </div>
+
+      <div class="panel sms-panel backup-panel">
+        <div class="panel-title">Резервна копія даних</div>
+        <p class="backup-hint">Історія, токени та налаштування зберігаються лише в цьому браузері. Раз на тиждень варто зробити експорт — так нічого не загубиться при очищенні кешу чи переході на інший компʼютер.</p>
+        <div class="actions">
+          <button class="btn btn-ghost" id="exportDataBtn" type="button">Експорт даних</button>
+          <button class="btn btn-ghost" id="importDataBtnLabel" type="button">Імпортувати дані</button>
+          <input type="file" id="importDataInput" accept="application/json" style="display:none;">
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -2001,10 +2016,23 @@ setInterval(pollTelegramUpdates, 15000);
 /* ========================================================================= */
 
 el('settingsToggleBtn').addEventListener('click', () => {
-  el('settingsDrawer').classList.toggle('open');
+  el('settingsModalOverlay').classList.add('open');
 });
+el('settingsModalClose').addEventListener('click', () => {
+  el('settingsModalOverlay').classList.remove('open');
+});
+el('settingsModalOverlay').addEventListener('click', (e) => {
+  if(e.target === el('settingsModalOverlay')) el('settingsModalOverlay').classList.remove('open');
+});
+
 el('historyToggleBtn').addEventListener('click', () => {
-  el('historyDrawer').classList.toggle('open');
+  el('historyModalOverlay').classList.add('open');
+});
+el('historyModalClose').addEventListener('click', () => {
+  el('historyModalOverlay').classList.remove('open');
+});
+el('historyModalOverlay').addEventListener('click', (e) => {
+  if(e.target === el('historyModalOverlay')) el('historyModalOverlay').classList.remove('open');
 });
 
 /* ================= INIT ================= */
