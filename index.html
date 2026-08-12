@@ -627,6 +627,15 @@ h1{
     <div class="panel">
       <div class="panel-title">Дані замовлення</div>
 
+      <!-- ВЕРНУТОЕ ПОЛЕ ДЛЯ НОМЕРА ЗАКАЗА PROM -->
+      <div class="field">
+        <label>№ замовлення Prom <span class="hint">(9 цифр)</span></label>
+        <div class="ttn-status-row">
+          <input id="promOrderId" placeholder="420567978" autocomplete="off" style="flex:1;">
+          <button class="btn btn-ghost btn-small" id="fetchPromOrderBtn" type="button">Підтягнути дані</button>
+        </div>
+      </div>
+
       <div class="field">
         <label>Товар <span class="hint" id="productHint"></span></label>
         <textarea id="product" rows="3" placeholder='Почни вводити назву або артикул — підтягнеться з каталогу Prom, або впиши вручну'></textarea>
@@ -684,15 +693,6 @@ h1{
       <div class="field">
         <label>ПІБ отримувача</label>
         <input id="fullname" placeholder="Гончаренко Олександр Іванович">
-      </div>
-
-      <!-- ВЕРНУТОЕ ПОЛЕ ДЛЯ НОМЕРА ЗАКАЗА PROM -->
-      <div class="field">
-        <label>№ замовлення Prom <span class="hint">(9 цифр)</span></label>
-        <div class="ttn-status-row">
-          <input id="promOrderId" placeholder="420567978" autocomplete="off" style="flex:1;">
-          <button class="btn btn-ghost btn-small" id="fetchPromOrderBtn" type="button">Підтягнути дані</button>
-        </div>
       </div>
 
       <div class="field" id="amountField">
