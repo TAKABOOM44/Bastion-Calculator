@@ -468,6 +468,14 @@ h1{
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
 .queue-item-sub{ font-size:11px; color:var(--text-dim); }
+.queue-item-footer{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.queue-archive-btn{
+  background:none; border:1px solid var(--line-strong); color:var(--text-dim);
+  border-radius:2px; padding:3px 7px; font-size:9.5px; cursor:pointer; font-family:'Manrope',sans-serif; font-weight:600;
+  flex-shrink:0;
+}
+.queue-archive-btn:hover{ color:var(--amber-dim); border-color:var(--amber-dim); }
+
 .queue-status{
   align-self:flex-start;
   display:inline-flex;
@@ -532,6 +540,21 @@ h1{
   display:flex; gap:18px; flex-wrap:wrap; margin-bottom:12px; font-size:11px; color:var(--text-dim);
 }
 .history-stats b{ color:var(--navy); font-family:'JetBrains Mono',monospace; font-weight:600; }
+.utm-stats{
+  display:flex; gap:14px; flex-wrap:wrap; margin-bottom:12px; font-size:10.5px; color:var(--text-dim);
+}
+.utm-stats-title{ width:100%; font-weight:600; color:var(--amber-dim); text-transform:uppercase; letter-spacing:.5px; font-size:10px; margin-bottom:2px; }
+.utm-stats b{ color:var(--navy); font-family:'JetBrains Mono',monospace; }
+
+.sms-tpl-edit{
+  border:1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding:12px;
+  margin-bottom:14px;
+  background: var(--bg-soft);
+}
+.sms-tpl-edit textarea{ font-size:12px; }
+.sms-tpl-edit code{ background:rgba(0,0,0,0.06); padding:1px 5px; border-radius:3px; font-family:'JetBrains Mono',monospace; }
 
 .field input.field-invalid{ border-color: var(--red); }
 
@@ -788,6 +811,27 @@ h1{
       </div>
 
       <div class="sms-tpl-list" id="smsTplList"></div>
+      <button class="btn btn-ghost btn-small" id="tplEditToggle" type="button" style="margin-bottom:14px;">✎ Редагувати шаблони</button>
+
+      <div class="sms-tpl-edit" id="smsTplEdit" style="display:none;">
+        <div class="field">
+          <label>Оформлення_Заказа</label>
+          <textarea id="tplEditOrder" rows="3"></textarea>
+        </div>
+        <div class="field">
+          <label>Товар на пошті</label>
+          <textarea id="tplEditWarehouse" rows="3"></textarea>
+        </div>
+        <div class="field">
+          <label>Інше</label>
+          <textarea id="tplEditOther" rows="2" placeholder="За замовчуванням порожньо"></textarea>
+        </div>
+        <p class="backup-hint">Використовуй <code>{ttn}</code> у тексті — при відправці він сам заміниться на реальний номер накладної.</p>
+        <div class="actions">
+          <button class="btn btn-ghost" id="tplEditCancel" type="button">Скасувати</button>
+          <button class="btn btn-primary" id="tplEditSave" type="button">Зберегти шаблони</button>
+        </div>
+      </div>
 
       <div class="field">
         <label>Текст SMS</label>
@@ -898,6 +942,7 @@ h1{
       <div class="history panel">
         <div class="panel-title">Історія замовлень</div>
         <div class="history-stats" id="historyStats"></div>
+        <div class="utm-stats" id="utmStats"></div>
         <input class="history-search" id="historySearch" placeholder="Пошук за телефоном, ПІБ або номером ТТН…" autocomplete="off">
         <div class="history-list" id="historyList"></div>
       </div>
@@ -1020,6 +1065,7 @@ document.addEventListener('keydown', (e)=>{
 });
 
 let activeHistoryId = null;
+let lastFetchedUtm = null;
 
 function pushHistory(msg, opts){
   opts = opts || {};
@@ -1043,6 +1089,7 @@ function pushHistory(msg, opts){
     smsId: '',
     smsStatus: '',
     promOrderId: el('promOrderId').value.trim(),
+    utm: lastFetchedUtm,
     viaTelegram: !!opts.viaTelegram,
     finalized: false
   };
@@ -1050,6 +1097,7 @@ function pushHistory(msg, opts){
   if(history.length > 30) history = history.slice(0,30);
   saveLS('np_history', history);
   activeHistoryId = entry.id;
+  lastFetchedUtm = null;
 
   ['region','city','street'].forEach(f=>{
     const val = el(f).value.trim();
@@ -1082,15 +1130,26 @@ function updateHistoryStats(){
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const startOfWeek = startOfToday - (((now.getDay() + 6) % 7) * 86400000);
   let todayCount = 0, weekCount = 0, todaySum = 0, weekSum = 0;
+  const utmCounts = {};
   history.forEach(h => {
     const ts = h.ts || 0;
     const amount = h.amount || 0;
     if(ts >= startOfToday){ todayCount++; todaySum += amount; }
     if(ts >= startOfWeek){ weekCount++; weekSum += amount; }
+    if(h.utm && h.utm.source){
+      const key = h.utm.source + (h.utm.campaign ? ` / ${h.utm.campaign}` : '');
+      utmCounts[key] = (utmCounts[key] || 0) + 1;
+    }
   });
   el('historyStats').innerHTML = history.length
     ? `<span>Сьогодні: <b>${todayCount}</b> замовл. · <b>${todaySum.toLocaleString('uk-UA')}</b> ₴</span>` +
       `<span>За тиждень: <b>${weekCount}</b> замовл. · <b>${weekSum.toLocaleString('uk-UA')}</b> ₴</span>`
+    : '';
+
+  const utmEntries = Object.entries(utmCounts).sort((a,b) => b[1]-a[1]).slice(0,6);
+  el('utmStats').innerHTML = utmEntries.length
+    ? '<div class="utm-stats-title">Джерела реклами (з даних Prom.ua):</div>' +
+      utmEntries.map(([src, count]) => `<span>${escapeHtml(src)}: <b>${count}</b></span>`).join('')
     : '';
 }
 
@@ -1151,7 +1210,7 @@ function renderHistory(){
 function renderQueue(){
   const list = el('queueList');
   if(!list) return;
-  const items = history.filter(h => h.viaTelegram);
+  const items = history.filter(h => h.viaTelegram && !h.archived);
 
   if(items.length === 0){
     list.innerHTML = '<div class="history-empty">Черга порожня — тут з’являться замовлення після відправки в Telegram</div>';
@@ -1161,7 +1220,9 @@ function renderQueue(){
   list.innerHTML = items.map(h => {
     const i = history.indexOf(h);
     let statusHtml;
-    if(h.hasError){
+    if(h.cancelled){
+      statusHtml = '<span class="queue-status queue-status-error"><span class="queue-dot"></span>Скасовано на Prom.ua</span>';
+    }else if(h.hasError){
       statusHtml = '<span class="queue-status queue-status-error"><span class="queue-dot"></span>Помилка</span>';
     }else if(h.finalized){
       statusHtml = '<span class="queue-status queue-status-done"><span class="queue-dot"></span>Завершено</span>';
@@ -1172,17 +1233,32 @@ function renderQueue(){
     }
     const isActive = h.id === activeHistoryId;
     const title = h.product ? h.product.split('\n')[0] : h.text.split('\n')[0];
+    const archiveBtn = h.finalized ? `<button class="queue-archive-btn" data-archive-i="${i}" title="Прибрати з черги">архівувати</button>` : '';
     return `
     <div class="queue-item${isActive ? ' active' : ''}" data-i="${i}">
       <div class="queue-item-main">${escapeHtml(title)}</div>
       <div class="queue-item-sub">${escapeHtml(h.fullname || '')} ${h.phone ? '· ' + escapeHtml(h.phone) : ''}</div>
-      ${statusHtml}
+      <div class="queue-item-footer">${statusHtml}${archiveBtn}</div>
     </div>
   `;
   }).join('');
 
   list.querySelectorAll('.queue-item').forEach(node => {
-    node.addEventListener('click', () => loadHistoryEntryIntoForm(+node.dataset.i));
+    node.addEventListener('click', (e) => {
+      if(e.target.closest('.queue-archive-btn')) return;
+      loadHistoryEntryIntoForm(+node.dataset.i);
+    });
+  });
+  list.querySelectorAll('.queue-archive-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = +btn.dataset.archiveI;
+      if(history[idx]){
+        history[idx].archived = true;
+        saveLS('np_history', history);
+        renderQueue();
+      }
+    });
   });
 }
 
@@ -1213,6 +1289,7 @@ function loadHistoryEntryIntoForm(index){
 }
 
 el('clearBtn').addEventListener('click', ()=>{
+  if(!confirm('Очистити форму? Незбережені дані буде втрачено.')) return;
   fields.forEach(f => el(f).value = '');
   el('whSearch').value = '';
   el('whSearch').disabled = true;
@@ -1229,7 +1306,7 @@ el('clearBtn').addEventListener('click', ()=>{
 });
 
 /* ================= РЕЗЕРВНА КОПІЯ ДАНИХ ================= */
-const BACKUP_KEYS = ['np_history','np_suggestions','np_api_key','prom_token','prom_catalog','smsclub_token','smsclub_alpha_list','smsclub_alpha_selected'];
+const BACKUP_KEYS = ['np_history','np_suggestions','np_api_key','prom_token','prom_catalog','smsclub_token','smsclub_alpha_list','smsclub_alpha_selected','sms_template_texts'];
 
 function exportData(){
   const payload = { version: 1, exportedAt: new Date().toISOString() };
@@ -1313,11 +1390,18 @@ async function applyPromOrderToForm(order){
   }
 
   if(order.products && order.products.length){
-    const names = order.products
-      .map(p => (p.name_multilang && p.name_multilang.uk) || p.name)
-      .filter(Boolean);
-    if(names.length) el('product').value = names.join(', ');
+    const lines = order.products.map(p => {
+      const name = (p.name_multilang && p.name_multilang.uk) || p.name || '';
+      const qty = p.quantity && p.quantity > 1 ? ` ×${p.quantity}` : '';
+      const match = findCatalogMatch(name);
+      const stock = match ? stockLabel(match) : '';
+      return `${name}${qty}${stock}`;
+    }).filter(Boolean);
+    if(lines.length) el('product').value = lines.join('\n');
   }
+
+  // Джерело реклами (UTM) — зберігаємо для статистики, побачити можна в "Історія та резервна копія"
+  lastFetchedUtm = order.utm || null;
 
   // Сума — Prom віддає рядок типу "1 469 грн", лишаємо тільки цифри
   if(order.price){
@@ -1658,6 +1742,20 @@ function extractUkName(p){
   return p.name || '(без назви)';
 }
 
+function stockLabel(it){
+  if(it.stock !== null && it.stock !== undefined) return ` · в наявності: ${it.stock} шт`;
+  if(it.presence) return ` · ${it.presence === 'available' ? 'в наявності' : it.presence}`;
+  return '';
+}
+
+function findCatalogMatch(name){
+  if(!name || !promCatalog.products.length) return null;
+  const clean = name.trim().toLowerCase();
+  return promCatalog.products.find(p => p.name.toLowerCase() === clean)
+      || promCatalog.products.find(p => clean.includes(p.name.toLowerCase()) || p.name.toLowerCase().includes(clean))
+      || null;
+}
+
 async function promFetchAllProducts(){
   if(!promToken) return;
   setPromStatus('', 'завантаження каталогу…');
@@ -1687,7 +1785,9 @@ async function promFetchAllProducts(){
         name: extractUkName(p),
         sku: p.sku || p.external_id || String(p.id || ''),
         price: p.price || '',
-        id: p.id
+        id: p.id,
+        presence: p.presence || '',
+        stock: (p.quantity_in_stock !== undefined && p.quantity_in_stock !== null) ? p.quantity_in_stock : null
       })),
       fetchedAt: new Date().toLocaleString('uk-UA', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'})
     };
@@ -1722,10 +1822,10 @@ makeAutocomplete({
       .filter(p => p.name.toLowerCase().includes(query) || (p.sku && String(p.sku).toLowerCase().includes(query)))
       .slice(0, 30);
   },
-  renderItem: (it) => `<div class="ac-main">${escapeHtml(it.name)}</div><div class="ac-meta">Артикул: ${escapeHtml(it.sku)}${it.price ? ' · ' + escapeHtml(String(it.price)) + ' грн' : ''}</div>`,
+  renderItem: (it) => `<div class="ac-main">${escapeHtml(it.name)}</div><div class="ac-meta">Артикул: ${escapeHtml(it.sku)}${it.price ? ' · ' + escapeHtml(String(it.price)) + ' грн' : ''}${stockLabel(it)}</div>`,
   onSelect: (it) => {
     el('product').value = it.name;
-    el('productHint').textContent = `✓ артикул ${it.sku}`;
+    el('productHint').textContent = `✓ артикул ${it.sku}${stockLabel(it)}`;
     render();
   }
 });
@@ -1751,20 +1851,18 @@ let smsAlphaList = loadLS('smsclub_alpha_list', []);
 let smsSelectedAlpha = loadLS('smsclub_alpha_selected', 'Zamovlennia');
 let smsActiveTpl = 'order';
 
-const SMS_TEMPLATES = {
-  order: {
-    label: 'Оформлення_Заказа',
-    build: () => `Вас вітає інтернет-магазин Бастіон\nДякуємо за ваше замовлення. Відправка буде здійснена найближчим часом.\nНомер ТТН: ${el('ttn').value.trim()}`
-  },
-  warehouse: {
-    label: 'Товар на пошті',
-    build: () => `Вас вітає інтернет-магазин Бастіон\nВаше замовлення №${el('ttn').value.trim()} вже прямує до відділення Нової пошти. Слідкуйте за посилкою на сайті Нової пошти.`
-  },
-  other: {
-    label: 'Інше',
-    build: () => ''
-  }
+const SMS_TEMPLATE_LABELS = { order: 'Оформлення_Заказа', warehouse: 'Товар на пошті', other: 'Інше' };
+const DEFAULT_SMS_TEMPLATE_TEXT = {
+  order: 'Вас вітає інтернет-магазин Бастіон\nДякуємо за ваше замовлення. Відправка буде здійснена найближчим часом.\nНомер ТТН: {ttn}',
+  warehouse: 'Вас вітає інтернет-магазин Бастіон\nВаше замовлення №{ttn} вже прямує до відділення Нової пошти. Слідкуйте за посилкою на сайті Нової пошти.',
+  other: ''
 };
+let smsTemplateTexts = loadLS('sms_template_texts', DEFAULT_SMS_TEMPLATE_TEXT);
+
+function buildTemplateText(key){
+  const raw = (smsTemplateTexts[key] !== undefined ? smsTemplateTexts[key] : DEFAULT_SMS_TEMPLATE_TEXT[key]) || '';
+  return raw.replace(/\{ttn\}/g, el('ttn').value.trim());
+}
 
 function setSmsclubStatus(mode, text){
   const dot = el('smsclubDot');
@@ -1819,10 +1917,10 @@ el('smsAlpha').addEventListener('change', ()=>{
 
 function renderSmsTemplates(){
   const list = el('smsTplList');
-  list.innerHTML = Object.keys(SMS_TEMPLATES).map(key => `
+  list.innerHTML = Object.keys(SMS_TEMPLATE_LABELS).map(key => `
     <label class="sms-tpl-opt ${key === smsActiveTpl ? 'active' : ''}" data-tpl="${key}">
       <input type="radio" name="smsTpl" value="${key}" ${key === smsActiveTpl ? 'checked' : ''}>
-      ${escapeHtml(SMS_TEMPLATES[key].label)}
+      ${escapeHtml(SMS_TEMPLATE_LABELS[key])}
     </label>
   `).join('');
   list.querySelectorAll('.sms-tpl-opt').forEach(node => {
@@ -1834,9 +1932,27 @@ function selectSmsTemplate(key){
   smsActiveTpl = key;
   el('smsTplList').querySelectorAll('.sms-tpl-opt').forEach(n => n.classList.toggle('active', n.dataset.tpl === key));
   el('smsTplList').querySelectorAll('input[type=radio]').forEach(r => r.checked = (r.value === key));
-  el('smsText').value = SMS_TEMPLATES[key].build();
+  el('smsText').value = buildTemplateText(key);
   updateSmsCharCounter();
 }
+
+el('tplEditToggle').addEventListener('click', () => {
+  el('tplEditOrder').value = smsTemplateTexts.order !== undefined ? smsTemplateTexts.order : DEFAULT_SMS_TEMPLATE_TEXT.order;
+  el('tplEditWarehouse').value = smsTemplateTexts.warehouse !== undefined ? smsTemplateTexts.warehouse : DEFAULT_SMS_TEMPLATE_TEXT.warehouse;
+  el('tplEditOther').value = smsTemplateTexts.other !== undefined ? smsTemplateTexts.other : DEFAULT_SMS_TEMPLATE_TEXT.other;
+  el('smsTplEdit').style.display = 'block';
+});
+el('tplEditCancel').addEventListener('click', () => { el('smsTplEdit').style.display = 'none'; });
+el('tplEditSave').addEventListener('click', () => {
+  smsTemplateTexts = {
+    order: el('tplEditOrder').value,
+    warehouse: el('tplEditWarehouse').value,
+    other: el('tplEditOther').value
+  };
+  saveLS('sms_template_texts', smsTemplateTexts);
+  el('smsTplEdit').style.display = 'none';
+  selectSmsTemplate(smsActiveTpl);
+});
 
 el('smsText').addEventListener('input', updateSmsCharCounter);
 function updateSmsCharCounter(){
@@ -2164,7 +2280,30 @@ async function pollTelegramUpdates() {
   }
 }
 
+async function pollPromOrderStatuses(){
+  if(!promToken) return;
+  const targets = history.filter(h => h.viaTelegram && !h.finalized && !h.archived && h.promOrderId);
+  for(const h of targets){
+    try{
+      const res = await fetch(`http://localhost:8787/prom/api/v1/orders/${encodeURIComponent(h.promOrderId)}`, {
+        headers: { 'Authorization': 'Bearer ' + promToken, 'Accept': 'application/json' }
+      });
+      const json = await res.json().catch(() => null);
+      const order = json && json.order;
+      if(order && order.status_name && /скасован|відмін/i.test(order.status_name) && !h.cancelled){
+        h.cancelled = true;
+        saveLS('np_history', history);
+        renderQueue();
+      }
+    }catch(err){ /* фонова перевірка — тихо ігноруємо поодинокі помилки мережі */ }
+  }
+}
+setInterval(pollPromOrderStatuses, 90000);
+
 setInterval(pollTelegramUpdates, 15000);
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible') pollTelegramUpdates();
+});
 /* ========================================================================= */
 
 el('settingsToggleBtn').addEventListener('click', () => {
