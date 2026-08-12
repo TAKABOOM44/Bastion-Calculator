@@ -1207,6 +1207,7 @@ async function resolvePromWarehouse(cityRef, warehouseRef){
     el('street').value = waddr;
     el('whSearch').value = `Відділення №${number}`;
     el('whHint').textContent = '✓ підтягнуто з Prom.ua';
+    render();
   }catch(err){
     el('whHint').textContent = 'не вдалося підтягнути відділення: ' + err.message;
   }
