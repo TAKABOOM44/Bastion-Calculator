@@ -231,10 +231,11 @@ h1{
 /* ---------- MAIN GRID ---------- */
 .grid{
   display:grid;
-  grid-template-columns: 1.1fr 1fr 0.85fr;
+  grid-template-columns: 1.2fr 1fr minmax(240px, 340px);
   gap: 18px;
   align-items:start;
 }
+.grid > .panel{ min-width:0; }
 @media(max-width:1300px){
   .grid{ grid-template-columns: 1.15fr 1fr; }
   .queue-panel{ grid-column: 1 / -1; }
@@ -445,8 +446,9 @@ h1{
 }
 .history-item button:hover{ color:var(--amber-dim); border-color:var(--amber-dim); }
 .queue-panel{ max-height:640px; display:flex; flex-direction:column; }
-.queue-list{ overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+.queue-list{ overflow-y:auto; display:flex; flex-direction:column; gap:8px; min-width:0; }
 .queue-item{
+  min-width:0;
   border:1px solid var(--line);
   background: var(--panel-2);
   border-radius: var(--radius);
@@ -468,16 +470,31 @@ h1{
 .queue-item-sub{ font-size:11px; color:var(--text-dim); }
 .queue-status{
   align-self:flex-start;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
   font-size:10px;
   font-weight:700;
   text-transform:uppercase;
   letter-spacing:.5px;
-  padding:3px 8px;
+  padding:4px 10px 4px 8px;
   border-radius:20px;
+  border:1px solid transparent;
 }
-.queue-status-waiting{ background:rgba(140,140,140,0.15); color:var(--text-dim); }
-.queue-status-ready{ background:rgba(201,132,66,0.18); color:var(--amber-dim); }
-.queue-status-done{ background:rgba(95,127,79,0.18); color:var(--green); }
+.queue-dot{
+  width:7px; height:7px;
+  border-radius:50%;
+  flex-shrink:0;
+  display:inline-block;
+}
+.queue-status-waiting{ background:rgba(196,158,58,0.14); color:#8a6d1f; border-color:rgba(196,158,58,0.35); }
+.queue-status-waiting .queue-dot{ background:#c49e3a; }
+
+.queue-status-done{ background:rgba(63,138,89,0.12); color:#2f7a4d; border-color:rgba(63,138,89,0.4); }
+.queue-status-done .queue-dot{ background:#3f8a59; }
+
+.queue-status-error{ background:rgba(190,70,60,0.12); color:#a83b30; border-color:rgba(190,70,60,0.4); }
+.queue-status-error .queue-dot{ background:#c2483c; }
 
 .history-empty{ color:var(--text-dim); font-size:12px; font-style:italic; padding:8px 0; }
 
@@ -1144,12 +1161,14 @@ function renderQueue(){
   list.innerHTML = items.map(h => {
     const i = history.indexOf(h);
     let statusHtml;
-    if(h.finalized){
-      statusHtml = '<span class="queue-status queue-status-done">✓ Завершено</span>';
+    if(h.hasError){
+      statusHtml = '<span class="queue-status queue-status-error"><span class="queue-dot"></span>Помилка</span>';
+    }else if(h.finalized){
+      statusHtml = '<span class="queue-status queue-status-done"><span class="queue-dot"></span>Завершено</span>';
     }else if(h.ttn){
-      statusHtml = '<span class="queue-status queue-status-ready">Готово до фіналізації</span>';
+      statusHtml = '<span class="queue-status queue-status-done"><span class="queue-dot"></span>Готово до фіналізації</span>';
     }else{
-      statusHtml = '<span class="queue-status queue-status-waiting">Очікує ТТН</span>';
+      statusHtml = '<span class="queue-status queue-status-waiting"><span class="queue-dot"></span>Очікує ТТН</span>';
     }
     const isActive = h.id === activeHistoryId;
     const title = h.product ? h.product.split('\n')[0] : h.text.split('\n')[0];
@@ -1902,9 +1921,9 @@ el('smsConfirmOk').addEventListener('click', async () => {
       smsResultLine = `<span class="fail">✗ SMS не відправлено — ${escapeHtml(err.message)}</span>`;
     }
   }
-  attachSmsToLatestHistory(smsId);
-
   const promResultLine = await pushTtnToProm();
+  const promFailed = promResultLine.indexOf('class="fail"') !== -1;
+  attachSmsToLatestHistory(smsId, promFailed);
 
   closeSmsConfirm();
   closeSmsModal();
@@ -1978,12 +1997,13 @@ async function pushTtnToProm(){
   return lines.join('<br>');
 }
 
-function attachSmsToLatestHistory(smsId){
+function attachSmsToLatestHistory(smsId, promFailed){
   if(!history.length) return;
   let h = activeHistoryId ? history.find(x => x.id === activeHistoryId) : null;
   if(!h) h = history[0]; // запасний варіант, якщо активний заказ з якоїсь причини не знайдено
   h.ttn = el('ttn').value.trim();
   h.finalized = true;
+  h.hasError = !!promFailed;
   if(smsId){
     h.smsId = smsId;
     h.smsStatus = 'ENROUTE';
