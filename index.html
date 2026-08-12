@@ -955,6 +955,7 @@ h1{
         <button id="smsclubSave">Зберегти</button>
         <span class="status-text" id="smsclubStatus">не підключено — SMS не відправляються</span>
         <a href="https://my.smsclub.mobi/en/profile" target="_blank" rel="noopener">де взяти токен →</a>
+        <span class="status-text" style="width:100%; opacity:.75;">⚠ для відправки потрібен локальний проксі — запусти start-smsclub-proxy.bat і залиш вікно відкритим</span>
       </div>
 
       <div class="apibar">
@@ -1917,7 +1918,7 @@ el('apiSave').addEventListener('click', ()=> applyApiKey(el('apiKey').value));
 el('apiKey').addEventListener('keydown', (e)=>{ if(e.key==='Enter') applyApiKey(el('apiKey').value); });
 
 /* ================= SMS CLUB ================= */
-const SMSCLUB_BASE = 'https://im.smsclub.mobi/sms';
+const SMSCLUB_BASE = 'http://localhost:8789/sms';
 const SMS_CHAR_LIMIT = 1071;
 let smsclubToken = loadLS('smsclub_token', '');
 let smsAlphaList = loadLS('smsclub_alpha_list', []);
