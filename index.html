@@ -517,6 +517,19 @@ h1{
 }
 .modal-actions .btn{ flex:1; }
 
+.finalize-checklist{
+  background: rgba(90,140,90,0.08);
+  border:1px solid rgba(90,140,90,0.3);
+  border-radius: var(--radius);
+  padding:10px 12px;
+  margin-bottom:14px;
+  font-size:12px;
+  color: var(--green);
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+
 .sms-balance-card{
   display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;
   background: var(--panel-2); border:1px solid var(--line); border-radius: var(--radius);
@@ -755,10 +768,16 @@ h1{
 <div class="modal-overlay" id="smsModalOverlay">
   <div class="modal-box">
     <div class="modal-header">
-      <h3>Відправка SMS</h3>
+      <h3>Фіналізація замовлення</h3>
       <button class="modal-close" id="smsModalClose">×</button>
     </div>
     <div class="modal-body">
+      <div class="finalize-checklist">
+        <div>✓ Відправка SMS клієнту</div>
+        <div>✓ Зміна статусу на Prom.ua → «Прийнято»</div>
+        <div>✓ Запис накладної (ТТН) на Prom.ua</div>
+      </div>
+
       <div class="sms-balance-card">
         <div class="sms-balance-left">
           <span class="sms-balance-logo">SMS CLUB</span>
