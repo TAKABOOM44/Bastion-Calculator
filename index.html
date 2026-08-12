@@ -690,8 +690,7 @@ h1{
       <label style="display:block;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);margin-bottom:6px;">Оплата</label>
       <div class="pay-toggle">
         <button type="button" class="pay-opt active" data-pay="cod">Накладений платіж</button>
-        <button type="button" class="pay-opt" data-pay="prepaid">Передоплата</button>
-        <button type="button" class="pay-opt" data-pay="none">Без суми</button>
+        <button type="button" class="pay-opt" data-pay="prepaid">Промоплата</button>
       </div>
 
     </div>
@@ -860,7 +859,7 @@ function buildMessage(){
   if(state.pay === 'cod'){
     lines.push(`Наложений платіж ${v('amount') || '—'}`);
   } else if(state.pay === 'prepaid'){
-    lines.push('Передоплата (100%)');
+    lines.push('Промоплата (100%)');
   }
 
   return lines.join('\n');
@@ -1143,19 +1142,14 @@ async function applyPromOrderToForm(order){
     if(cleanAmount) el('amount').value = cleanAmount;
   }
 
-  // Тип оплати — визначаємо за назвою способу оплати від Prom.ua
+  // Тип оплати — визначаємо за назвою способу оплати від Prom.ua.
+  // У нас лише два реальні варіанти, тому завжди обираємо один з них (без "невизначено").
   const payName = ((order.payment_option && order.payment_option.name) || '').toLowerCase();
-  let detectedPay = null;
-  if(payName.indexOf('наклад') !== -1 || payName.indexOf('післяплат') !== -1){
-    detectedPay = 'cod';
-  }else if(payName.indexOf('передоплат') !== -1 || payName.indexOf('оплачен') !== -1){
-    detectedPay = 'prepaid';
-  }
-  if(detectedPay){
-    document.querySelectorAll('.pay-opt').forEach(b => b.classList.toggle('active', b.dataset.pay === detectedPay));
-    state.pay = detectedPay;
-    el('amountField').style.display = detectedPay === 'cod' ? 'block' : 'none';
-  }
+  const isCod = payName.indexOf('наклад') !== -1 || payName.indexOf('наложен') !== -1 || payName.indexOf('післяплат') !== -1 || payName.indexOf('послеплат') !== -1;
+  const detectedPay = isCod ? 'cod' : 'prepaid';
+  document.querySelectorAll('.pay-opt').forEach(b => b.classList.toggle('active', b.dataset.pay === detectedPay));
+  state.pay = detectedPay;
+  el('amountField').style.display = detectedPay === 'cod' ? 'block' : 'none';
 
   // Адреса — якщо Prom дав GUID міста/відділення Нової пошти, підтягуємо повністю автоматично
   const addr = order.delivery_provider_data && order.delivery_provider_data.recipient_address;
