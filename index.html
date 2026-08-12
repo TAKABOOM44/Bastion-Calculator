@@ -689,7 +689,10 @@ h1{
       <!-- ВЕРНУТОЕ ПОЛЕ ДЛЯ НОМЕРА ЗАКАЗА PROM -->
       <div class="field">
         <label>№ замовлення Prom <span class="hint">(9 цифр)</span></label>
-        <input id="promOrderId" placeholder="420567978" autocomplete="off">
+        <div class="ttn-status-row">
+          <input id="promOrderId" placeholder="420567978" autocomplete="off" style="flex:1;">
+          <button class="btn btn-ghost btn-small" id="fetchPromOrderBtn" type="button">Підтягнути дані</button>
+        </div>
       </div>
 
       <div class="field" id="amountField">
@@ -1094,6 +1097,68 @@ el('importDataInput').addEventListener('change', (e) => {
   const file = e.target.files[0];
   if(file) importData(file);
 });
+
+/* ================= ПІДТЯГНУТИ ДАНІ ЗАМОВЛЕННЯ З PROM.UA ================= */
+el('fetchPromOrderBtn').addEventListener('click', fetchPromOrder);
+el('promOrderId').addEventListener('keydown', (e) => { if(e.key === 'Enter'){ e.preventDefault(); fetchPromOrder(); } });
+
+async function fetchPromOrder(){
+  const promId = el('promOrderId').value.trim();
+  const btn = el('fetchPromOrderBtn');
+  if(!promId){ alert('Спочатку вкажи № замовлення Prom.'); return; }
+  if(!promToken){ alert('Спочатку підключи токен Prom.ua (панель «⚙ Підключення»).'); return; }
+
+  const orig = btn.textContent;
+  btn.textContent = 'Завантаження…';
+  btn.disabled = true;
+  try{
+    const res = await fetch(`http://localhost:8787/prom/api/v1/orders/${encodeURIComponent(promId)}`, {
+      headers: { 'Authorization': 'Bearer ' + promToken, 'Accept': 'application/json' }
+    });
+    const json = await res.json().catch(() => null);
+    if(!res.ok || !json || !json.order){
+      throw new Error((json && json.error) || `HTTP ${res.status}`);
+    }
+    applyPromOrderToForm(json.order);
+    btn.textContent = 'Готово ✓';
+  }catch(err){
+    alert('Не вдалося завантажити замовлення з Prom.ua: ' + err.message);
+  }finally{
+    setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+  }
+}
+
+function applyPromOrderToForm(order){
+  const nameParts = [order.client_last_name, order.client_first_name, order.client_second_name].filter(Boolean);
+  if(nameParts.length) el('fullname').value = nameParts.join(' ');
+
+  if(order.phone){
+    let digits = String(order.phone).replace(/\D/g, '');
+    if(digits.startsWith('380')) digits = '0' + digits.slice(3);
+    digits = digits.slice(0, 10);
+    let out = digits.slice(0, 3);
+    if(digits.length > 3) out += ' ' + digits.slice(3, 6);
+    if(digits.length > 6) out += ' ' + digits.slice(6, 8);
+    if(digits.length > 8) out += ' ' + digits.slice(8, 10);
+    el('phone').value = out;
+  }
+
+  if(order.products && order.products.length){
+    const names = order.products
+      .map(p => (p.name_multilang && p.name_multilang.uk) || p.name)
+      .filter(Boolean);
+    if(names.length) el('product').value = names.join(', ');
+  }
+
+  // delivery_address у Prom.ua — це одна готова строка (місто + відділення + вулиця разом),
+  // не розбита на окремі поля. Вставляємо як підказку у "Вулиця", а місто/відділення
+  // для Нової пошти обери сам через автокомплит нижче — так надійніше, ніж парсити текст.
+  if(order.delivery_address) el('street').value = order.delivery_address;
+
+  if(order.price) el('amount').value = order.price;
+
+  render();
+}
 
 /* ================= СТАТУС ТТН (НОВА ПОШТА) ================= */
 el('ttnCheckBtn').addEventListener('click', checkTtnStatus);
