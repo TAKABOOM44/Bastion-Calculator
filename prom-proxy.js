@@ -57,7 +57,7 @@ const server = http.createServer((req, res) => {
         proxyRes.on('data', (chunk) => resChunks.push(chunk));
         proxyRes.on('end', () => {
           const resBody = Buffer.concat(resChunks);
-          log(`відповідь ${proxyRes.statusCode}: ${resBody.toString().slice(0, 500)}`);
+          log(`відповідь ${proxyRes.statusCode}: ${resBody.toString().slice(0, 4000)}`);
           res.writeHead(proxyRes.statusCode, { 'Content-Type': proxyRes.headers['content-type'] || 'application/json' });
           res.end(resBody);
         });
