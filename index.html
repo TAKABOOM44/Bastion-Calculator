@@ -672,16 +672,11 @@ h1{
         <div class="ac-list" id="whAc"></div>
       </div>
 
-      <div class="field-row">
-        <div class="field">
-          <label>Вулиця, будинок</label>
-          <input id="street" placeholder="заповнюється автоматично">
-        </div>
-        <div class="field">
-          <label>№ відділення</label>
-          <input id="warehouse" placeholder="заповнюється автоматично">
-        </div>
+      <div class="field">
+        <label>Вулиця, будинок</label>
+        <input id="street" placeholder="заповнюється автоматично">
       </div>
+      <input id="warehouse" type="hidden">
 
       <div class="field">
         <label>ПІБ отримувача</label>
@@ -1111,7 +1106,7 @@ async function fetchPromOrder(){
     if(!res.ok || !json || !json.order){
       throw new Error((json && json.error) || `HTTP ${res.status}`);
     }
-    applyPromOrderToForm(json.order);
+    await applyPromOrderToForm(json.order);
     btn.textContent = 'Готово ✓';
   }catch(err){
     alert('Не вдалося завантажити замовлення з Prom.ua: ' + err.message);
@@ -1120,7 +1115,7 @@ async function fetchPromOrder(){
   }
 }
 
-function applyPromOrderToForm(order){
+async function applyPromOrderToForm(order){
   const nameParts = [order.client_last_name, order.client_first_name, order.client_second_name].filter(Boolean);
   if(nameParts.length) el('fullname').value = nameParts.join(' ');
 
@@ -1169,7 +1164,7 @@ function applyPromOrderToForm(order){
     state.cityRef = addr.city_id;
     el('whSearch').disabled = false;
     el('cityHint').textContent = '✓ підтягнуто з Prom.ua';
-    resolvePromWarehouse(addr.city_id, addr.warehouse_id);
+    await resolvePromWarehouse(addr.city_id, addr.warehouse_id);
   }else if(order.delivery_address){
     // немає структурованих даних (напр. курʼєрська доставка) — вставляємо як підказку в "Вулиця"
     el('street').value = order.delivery_address;
