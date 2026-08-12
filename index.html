@@ -1151,7 +1151,13 @@ async function applyPromOrderToForm(order){
   state.pay = detectedPay;
   el('amountField').style.display = detectedPay === 'cod' ? 'block' : 'none';
 
-  // Адреса — якщо Prom дав GUID міста/відділення Нової пошти, підтягуємо повністю автоматично
+  // Адреса — якщо Prom дав GUID міста/відділення Нової пошти, підтягуємо повністю автоматично.
+  // Спочатку чистимо старі значення, щоб не залишалось даних від попереднього замовлення.
+  el('street').value = '';
+  el('warehouse').value = '';
+  el('whSearch').value = '';
+  el('whHint').textContent = '';
+
   const addr = order.delivery_provider_data && order.delivery_provider_data.recipient_address;
   if(addr && addr.city_id && addr.warehouse_id){
     el('city').value = addr.city_name || '';
@@ -1171,19 +1177,36 @@ async function resolvePromWarehouse(cityRef, warehouseRef){
   try{
     const list = await npGetWarehouses(cityRef);
     state.warehouses = list;
-    const data = await npCall('AddressGeneral', 'getWarehouses', { Ref: warehouseRef, Language: 'UA' });
+
+    let number, waddr;
+
+    // 1) Пряме звернення по Ref
+    const data = await npCall('AddressGeneral', 'getWarehouses', { Ref: warehouseRef, Language: 'UA' }).catch(() => null);
     const w = data && data[0];
-    if(!w){ el('whHint').textContent = 'не вдалося знайти відділення за даними Prom.ua'; return; }
-    let number = w.Number;
+    if(w){
+      number = w.Number;
+      if(!number){
+        const m = (w.Description || '').match(/№\s*(\d+)/);
+        number = m ? m[1] : '';
+      }
+      waddr = w.ShortAddress || '';
+      if(!waddr && w.Description){
+        const parts = w.Description.split(':');
+        waddr = parts.length > 1 ? parts.slice(1).join(':').trim() : w.Description;
+      }
+    }else{
+      // 2) Запасний варіант — шукаємо той самий Ref у повному списку відділень міста
+      // (буває, що пряме звернення по Ref не спрацьовує, а в загальному списку відділення є)
+      const found = list.find(item => item.ref === warehouseRef);
+      if(found){ number = found.number; waddr = found.addr; }
+    }
+
     if(!number){
-      const m = (w.Description || '').match(/№\s*(\d+)/);
-      number = m ? m[1] : '';
+      el('whHint').textContent = 'не вдалося знайти відділення за даними Prom.ua — обери вручну нижче';
+      el('whSearch').focus();
+      return;
     }
-    let waddr = w.ShortAddress || '';
-    if(!waddr && w.Description){
-      const parts = w.Description.split(':');
-      waddr = parts.length > 1 ? parts.slice(1).join(':').trim() : w.Description;
-    }
+
     el('warehouse').value = number;
     el('street').value = waddr;
     el('whSearch').value = `Відділення №${number}`;
@@ -1268,7 +1291,7 @@ async function npGetWarehouses(cityRef){
     }
     return {
       label: w.Description || (`Відділення №${number}: ${addr}`),
-      number, addr,
+      number, addr, ref: w.Ref,
       typeDesc: w.TypeOfWarehouse || ''
     };
   });
