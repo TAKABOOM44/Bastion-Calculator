@@ -2220,6 +2220,68 @@ el('tgConfirmOk').addEventListener('click', async () => {
 /* ================= АВТОМАТИЧНЕ ОТРИМАННЯ ТТН + АВТО-ПЕРЕДАЧА НА PROM.UA ================= */
 let tgLastUpdateId = loadLS('tg_last_update_id', 0);
 
+/* ================= ЗВУКОВЕ ТА ВІЗУАЛЬНЕ СПОВІЩЕННЯ ================= */
+// Звук згенеровано кодом (осцилятори), жодних чужих файлів — приглушений тон + м'який дзвіночок.
+let notifyAudioCtx = null;
+function getNotifyCtx(){
+  if(!notifyAudioCtx) notifyAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return notifyAudioCtx;
+}
+function notifyTone(freq, startTime, duration, gainPeak, attack, cutoff){
+  const context = getNotifyCtx();
+  const osc = context.createOscillator();
+  const gain = context.createGain();
+  const filter = context.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = cutoff || 3000;
+  filter.Q.value = 0.6;
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  const a = attack || 0.06;
+  const t0 = context.currentTime + startTime;
+  gain.gain.setValueAtTime(0, t0);
+  gain.gain.linearRampToValueAtTime(gainPeak, t0 + a);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+  osc.connect(filter).connect(gain).connect(context.destination);
+  osc.start(t0);
+  osc.stop(t0 + duration + 0.05);
+}
+function playNotifySound(){
+  try{
+    const muffleFreq = 330, muffleCutoff = 900, muffleDur = 0.3;
+    const bellFreq = 659, bellCutoff = 2600, gap = 0.08;
+    const bellStart = muffleDur * 0.6 + gap;
+    const bellDur = 0.9;
+
+    notifyTone(muffleFreq, 0, muffleDur, 0.22, 0.05, muffleCutoff);
+    notifyTone(muffleFreq * 1.5, 0.02, muffleDur * 0.8, 0.10, 0.05, muffleCutoff);
+    notifyTone(bellFreq, bellStart, bellDur, 0.30, 0.05, bellCutoff);
+    notifyTone(bellFreq * 2.0, bellStart, bellDur * 0.7, 0.09, 0.05, bellCutoff);
+  }catch(err){ /* якщо браузер заблокував автоплей — просто без звуку, візуальне сповіщення лишається */ }
+}
+
+const ORIGINAL_TITLE = document.title;
+let titleFlashTimer = null;
+function startTitleFlash(){
+  if(titleFlashTimer) return;
+  let flip = false;
+  titleFlashTimer = setInterval(() => {
+    document.title = flip ? ORIGINAL_TITLE : '🔔 Нове ТТН — Бастіон';
+    flip = !flip;
+  }, 1000);
+}
+function stopTitleFlash(){
+  if(titleFlashTimer){
+    clearInterval(titleFlashTimer);
+    titleFlashTimer = null;
+    document.title = ORIGINAL_TITLE;
+  }
+}
+function notifyQueueReady(){
+  playNotifySound();
+  startTitleFlash();
+}
+
 async function pollTelegramUpdates() {
   if (!tgBotToken || !tgChatId) return;
 
@@ -2264,6 +2326,7 @@ async function pollTelegramUpdates() {
 
               renderHistory();
               renderQueue();
+              notifyQueueReady();
 
               if(history[historyIndex].id === activeHistoryId){
                 el('ttn').value = foundTtn;
@@ -2302,7 +2365,10 @@ setInterval(pollPromOrderStatuses, 90000);
 
 setInterval(pollTelegramUpdates, 15000);
 document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState === 'visible') pollTelegramUpdates();
+  if(document.visibilityState === 'visible'){
+    pollTelegramUpdates();
+    stopTitleFlash();
+  }
 });
 /* ========================================================================= */
 
