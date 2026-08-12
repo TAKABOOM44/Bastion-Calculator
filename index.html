@@ -1157,6 +1157,7 @@ async function applyPromOrderToForm(order){
   el('warehouse').value = '';
   el('whSearch').value = '';
   el('whHint').textContent = '';
+  el('region').value = '';
 
   const addr = order.delivery_provider_data && order.delivery_provider_data.recipient_address;
   if(addr && addr.city_id && addr.warehouse_id){
