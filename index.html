@@ -1102,14 +1102,6 @@ el('importDataInput').addEventListener('change', (e) => {
 el('fetchPromOrderBtn').addEventListener('click', fetchPromOrder);
 el('promOrderId').addEventListener('keydown', (e) => { if(e.key === 'Enter'){ e.preventDefault(); fetchPromOrder(); } });
 
-let promOrderIdAutoTimer = null;
-el('promOrderId').addEventListener('input', () => {
-  clearTimeout(promOrderIdAutoTimer);
-  if(el('promOrderId').value.trim().length >= 9){
-    promOrderIdAutoTimer = setTimeout(() => fetchPromOrder(), 400);
-  }
-});
-
 async function fetchPromOrder(){
   const promId = el('promOrderId').value.trim();
   const btn = el('fetchPromOrderBtn');
