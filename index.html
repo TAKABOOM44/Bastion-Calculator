@@ -1181,25 +1181,28 @@ async function resolvePromWarehouse(cityRef, warehouseRef){
 
     let number, waddr;
 
-    // 1) Пряме звернення по Ref
-    const data = await npCall('AddressGeneral', 'getWarehouses', { Ref: warehouseRef, Language: 'UA' }).catch(() => null);
-    const w = data && data[0];
-    if(w){
-      number = w.Number;
-      if(!number){
-        const m = (w.Description || '').match(/№\s*(\d+)/);
-        number = m ? m[1] : '';
-      }
-      waddr = w.ShortAddress || '';
-      if(!waddr && w.Description){
-        const parts = w.Description.split(':');
-        waddr = parts.length > 1 ? parts.slice(1).join(':').trim() : w.Description;
-      }
+    // 1) Спочатку шукаємо в уже завантаженому списку відділень міста — без жодного додаткового запиту
+    const found = list.find(item => item.ref === warehouseRef);
+    if(found){
+      number = found.number;
+      waddr = found.addr;
     }else{
-      // 2) Запасний варіант — шукаємо той самий Ref у повному списку відділень міста
-      // (буває, що пряме звернення по Ref не спрацьовує, а в загальному списку відділення є)
-      const found = list.find(item => item.ref === warehouseRef);
-      if(found){ number = found.number; waddr = found.addr; }
+      // 2) Не знайшли в стандартному списку — пробуємо один прямий запит по Ref
+      // (рідкісний випадок: відділення закрите/приховане, але Ref ще технічно існує)
+      const data = await npCall('AddressGeneral', 'getWarehouses', { Ref: warehouseRef, Language: 'UA' }).catch(() => null);
+      const w = data && data[0];
+      if(w){
+        number = w.Number;
+        if(!number){
+          const m = (w.Description || '').match(/№\s*(\d+)/);
+          number = m ? m[1] : '';
+        }
+        waddr = w.ShortAddress || '';
+        if(!waddr && w.Description){
+          const parts = w.Description.split(':');
+          waddr = parts.length > 1 ? parts.slice(1).join(':').trim() : w.Description;
+        }
+      }
     }
 
     if(!number){
@@ -1214,7 +1217,10 @@ async function resolvePromWarehouse(cityRef, warehouseRef){
     el('whHint').textContent = '✓ підтягнуто з Prom.ua';
     render();
   }catch(err){
-    el('whHint').textContent = 'не вдалося підтягнути відділення: ' + err.message;
+    const isRateLimit = /429|many requests|too many/i.test(err.message);
+    el('whHint').textContent = isRateLimit
+      ? 'Нова пошта тимчасово обмежила запити — зачекай кілька секунд і натисни «Підтягнути дані» ще раз'
+      : 'не вдалося підтягнути відділення: ' + err.message;
   }
 }
 
