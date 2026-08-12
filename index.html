@@ -446,6 +446,13 @@ h1{
 }
 .history-item button:hover{ color:var(--amber-dim); border-color:var(--amber-dim); }
 .queue-panel{ max-height:640px; display:flex; flex-direction:column; }
+.queue-panel-header{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+.queue-clear-all-btn{
+  background:none; border:1px solid var(--line-strong); color:var(--text-dim);
+  border-radius:4px; padding:5px 10px; font-size:10.5px; cursor:pointer; font-family:'Manrope',sans-serif; font-weight:600;
+  flex-shrink:0;
+}
+.queue-clear-all-btn:hover{ color:var(--red); border-color:var(--red); }
 .queue-list{ overflow-y:auto; display:flex; flex-direction:column; gap:8px; min-width:0; }
 .queue-item{
   min-width:0;
@@ -755,7 +762,10 @@ h1{
     </div>
 
     <div class="panel queue-panel">
-      <div class="panel-title">Черга замовлень</div>
+      <div class="queue-panel-header">
+        <div class="panel-title">Черга замовлень</div>
+        <button class="queue-clear-all-btn" id="queueClearAllBtn" type="button">Очистити всі</button>
+      </div>
       <div class="queue-list" id="queueList"></div>
     </div>
   </div>
@@ -891,6 +901,21 @@ h1{
     <div class="modal-actions">
       <button class="btn btn-ghost" id="clearConfirmCancel">Скасувати</button>
       <button class="btn btn-primary" id="clearConfirmOk">Очистити</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="queueClearAllOverlay">
+  <div class="modal-box modal-box-small">
+    <div class="modal-header">
+      <h3>Підтвердження</h3>
+    </div>
+    <div class="modal-body">
+      <p style="margin:0;">Прибрати всі <strong id="queueClearAllCount"></strong> замовлень з черги? Дані лишаться в історії.</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="queueClearAllCancel">Скасувати</button>
+      <button class="btn btn-primary" id="queueClearAllOk">Очистити всі</button>
     </div>
   </div>
 </div>
@@ -1248,7 +1273,7 @@ function renderQueue(){
     }
     const isActive = h.id === activeHistoryId;
     const title = h.product ? h.product.split('\n')[0] : h.text.split('\n')[0];
-    const archiveBtn = h.finalized ? `<button class="queue-archive-btn" data-archive-i="${i}" title="Прибрати з черги">архівувати</button>` : '';
+    const archiveBtn = `<button class="queue-archive-btn" data-archive-i="${i}" title="Прибрати з черги">✕ очистити</button>`;
     return `
     <div class="queue-item${isActive ? ' active' : ''}" data-i="${i}">
       <div class="queue-item-main">${escapeHtml(title)}</div>
@@ -1276,6 +1301,25 @@ function renderQueue(){
     });
   });
 }
+
+el('queueClearAllBtn').addEventListener('click', () => {
+  const visible = history.filter(h => h.viaTelegram && !h.archived);
+  if(!visible.length) return;
+  el('queueClearAllCount').textContent = visible.length;
+  el('queueClearAllOverlay').classList.add('open');
+});
+el('queueClearAllOk').addEventListener('click', () => {
+  history.filter(h => h.viaTelegram && !h.archived).forEach(h => { h.archived = true; });
+  saveLS('np_history', history);
+  renderQueue();
+  el('queueClearAllOverlay').classList.remove('open');
+});
+el('queueClearAllCancel').addEventListener('click', () => {
+  el('queueClearAllOverlay').classList.remove('open');
+});
+el('queueClearAllOverlay').addEventListener('click', (e) => {
+  if(e.target === el('queueClearAllOverlay')) el('queueClearAllOverlay').classList.remove('open');
+});
 
 function loadHistoryEntryIntoForm(index){
   const h = history[index];
