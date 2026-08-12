@@ -1158,14 +1158,66 @@ function applyPromOrderToForm(order){
     if(names.length) el('product').value = names.join(', ');
   }
 
-  // delivery_address у Prom.ua — це одна готова строка (місто + відділення + вулиця разом),
-  // не розбита на окремі поля. Вставляємо як підказку у "Вулиця", а місто/відділення
-  // для Нової пошти обери сам через автокомплит нижче — так надійніше, ніж парсити текст.
-  if(order.delivery_address) el('street').value = order.delivery_address;
+  // Сума — Prom віддає рядок типу "1 469 грн", лишаємо тільки цифри
+  if(order.price){
+    const cleanAmount = String(order.price).replace(/[^\d]/g, '');
+    if(cleanAmount) el('amount').value = cleanAmount;
+  }
 
-  if(order.price) el('amount').value = order.price;
+  // Тип оплати — визначаємо за назвою способу оплати від Prom.ua
+  const payName = ((order.payment_option && order.payment_option.name) || '').toLowerCase();
+  let detectedPay = null;
+  if(payName.indexOf('наклад') !== -1 || payName.indexOf('післяплат') !== -1){
+    detectedPay = 'cod';
+  }else if(payName.indexOf('передоплат') !== -1 || payName.indexOf('оплачен') !== -1){
+    detectedPay = 'prepaid';
+  }
+  if(detectedPay){
+    document.querySelectorAll('.pay-opt').forEach(b => b.classList.toggle('active', b.dataset.pay === detectedPay));
+    state.pay = detectedPay;
+    el('amountField').style.display = detectedPay === 'cod' ? 'block' : 'none';
+  }
+
+  // Адреса — якщо Prom дав GUID міста/відділення Нової пошти, підтягуємо повністю автоматично
+  const addr = order.delivery_provider_data && order.delivery_provider_data.recipient_address;
+  if(addr && addr.city_id && addr.warehouse_id){
+    el('city').value = addr.city_name || '';
+    state.cityRef = addr.city_id;
+    el('whSearch').disabled = false;
+    el('cityHint').textContent = '✓ підтягнуто з Prom.ua';
+    resolvePromWarehouse(addr.city_id, addr.warehouse_id);
+  }else if(order.delivery_address){
+    // немає структурованих даних (напр. курʼєрська доставка) — вставляємо як підказку в "Вулиця"
+    el('street').value = order.delivery_address;
+  }
 
   render();
+}
+
+async function resolvePromWarehouse(cityRef, warehouseRef){
+  try{
+    const list = await npGetWarehouses(cityRef);
+    state.warehouses = list;
+    const data = await npCall('AddressGeneral', 'getWarehouses', { Ref: warehouseRef, Language: 'UA' });
+    const w = data && data[0];
+    if(!w){ el('whHint').textContent = 'не вдалося знайти відділення за даними Prom.ua'; return; }
+    let number = w.Number;
+    if(!number){
+      const m = (w.Description || '').match(/№\s*(\d+)/);
+      number = m ? m[1] : '';
+    }
+    let waddr = w.ShortAddress || '';
+    if(!waddr && w.Description){
+      const parts = w.Description.split(':');
+      waddr = parts.length > 1 ? parts.slice(1).join(':').trim() : w.Description;
+    }
+    el('warehouse').value = number;
+    el('street').value = waddr;
+    el('whSearch').value = `Відділення №${number}`;
+    el('whHint').textContent = '✓ підтягнуто з Prom.ua';
+  }catch(err){
+    el('whHint').textContent = 'не вдалося підтягнути відділення: ' + err.message;
+  }
 }
 
 /* ================= СТАТУС ТТН (НОВА ПОШТА) ================= */
