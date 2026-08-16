@@ -962,7 +962,8 @@ h1{
         <span class="dot" id="tgDot"></span>
         <label>Telegram бот</label>
         <input id="tgToken" type="text" placeholder="токен бота від @BotFather" autocomplete="off">
-        <input id="tgChatId" type="text" placeholder="chat_id групи (напр. -100123456789)" autocomplete="off" style="max-width:220px;">
+        <input id="tgChatId" type="text" placeholder="chat_id групи постачальників" autocomplete="off" style="max-width:220px;">
+        <input id="tgPersonalChatId" type="text" placeholder="chat_id для особистих сповіщень (нові заказы Prom)" autocomplete="off" style="max-width:280px;">
         <button id="tgSave">Зберегти</button>
         <span class="status-text" id="tgStatus">не підключено — відправка в Telegram вимкнена</span>
         <span class="status-text" style="width:100%; opacity:.75;">⚠ для відправки потрібен локальний проксі — запусти start-telegram-proxy.bat і залиш вікно відкритим</span>
@@ -2224,6 +2225,7 @@ async function checkSmsStatusForHistory(index){
 const TELEGRAM_PROXY = 'http://localhost:8788/telegram';
 let tgBotToken = loadLS('tg_bot_token', '8985597003:AAEXX2krUJTm4W5hdvV3EwXa46BW6F-Yy40');
 let tgChatId = loadLS('tg_chat_id', '-5166193124');
+let tgPersonalChatId = loadLS('tg_personal_chat_id', '');
 
 function setTgStatus(mode, text){
   const dot = el('tgDot');
@@ -2238,8 +2240,10 @@ function refreshTgStatusText(){
 function applyTgSettings(){
   tgBotToken = el('tgToken').value.trim();
   tgChatId = el('tgChatId').value.trim();
+  tgPersonalChatId = el('tgPersonalChatId').value.trim();
   saveLS('tg_bot_token', tgBotToken);
   saveLS('tg_chat_id', tgChatId);
+  saveLS('tg_personal_chat_id', tgPersonalChatId);
   refreshTgStatusText();
 }
 el('tgSave').addEventListener('click', applyTgSettings);
@@ -2437,6 +2441,49 @@ async function pollPromOrderStatuses(){
 }
 setInterval(pollPromOrderStatuses, 90000);
 
+/* ================= НОВІ ЗАМОВЛЕННЯ НА PROM.UA (особисте сповіщення) ================= */
+let seenPromOrderIds = loadLS('seen_prom_order_ids', []);
+
+async function pollNewPromOrders(){
+  if(!promToken || !tgBotToken || !tgPersonalChatId) return;
+  try{
+    const res = await fetch('http://localhost:8787/prom/api/v1/orders/list?limit=20&status=pending', {
+      headers: { 'Authorization': 'Bearer ' + promToken, 'Accept': 'application/json' }
+    });
+    const json = await res.json().catch(() => null);
+    const orders = (json && (json.orders || (Array.isArray(json) ? json : null))) || [];
+    if(!orders.length) return;
+
+    // Перший запуск — просто запам'ятовуємо поточні "нові", щоб не засипати сповіщеннями про старе
+    if(seenPromOrderIds.length === 0){
+      seenPromOrderIds = orders.map(o => o.id);
+      saveLS('seen_prom_order_ids', seenPromOrderIds);
+      return;
+    }
+
+    const freshOnes = orders.filter(o => !seenPromOrderIds.includes(o.id));
+    if(!freshOnes.length) return;
+
+    for(const o of freshOnes){
+      const name = [o.client_last_name, o.client_first_name].filter(Boolean).join(' ');
+      const text = `🆕 Нове замовлення на Prom.ua\n№ ${o.id}\n${name || '—'}\n${o.phone || ''}\n${o.price || ''}`;
+      try{
+        await fetch(`${TELEGRAM_PROXY}/bot${tgBotToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: tgPersonalChatId, text })
+        });
+      }catch(e){ /* одна невдала відправка не повинна зупиняти інші */ }
+    }
+
+    seenPromOrderIds = [...seenPromOrderIds, ...freshOnes.map(o => o.id)].slice(-500);
+    saveLS('seen_prom_order_ids', seenPromOrderIds);
+
+    notifyQueueReady(); // той самий звук+блимання заголовку, раз вже є напоготові
+  }catch(err){ /* фонова перевірка — тихо ігноруємо поодинокі помилки мережі */ }
+}
+setInterval(pollNewPromOrders, 45000);
+
 setInterval(pollTelegramUpdates, 15000);
 document.addEventListener('visibilitychange', () => {
   if(document.visibilityState === 'visible'){
@@ -2475,6 +2522,7 @@ el('smsclubToken').value = smsclubToken;
 refreshSmsclubStatusText();
 el('tgToken').value = tgBotToken;
 el('tgChatId').value = tgChatId;
+el('tgPersonalChatId').value = tgPersonalChatId;
 refreshTgStatusText();
 renderSuggestions();
 renderHistory();
