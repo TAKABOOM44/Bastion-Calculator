@@ -965,6 +965,7 @@ h1{
         <input id="tgChatId" type="text" placeholder="chat_id групи постачальників" autocomplete="off" style="max-width:220px;">
         <input id="tgPersonalChatId" type="text" placeholder="chat_id для особистих сповіщень (нові заказы Prom)" autocomplete="off" style="max-width:280px;">
         <button id="tgSave">Зберегти</button>
+        <button id="tgTestNotify" type="button">🧪 Тест сповіщення</button>
         <span class="status-text" id="tgStatus">не підключено — відправка в Telegram вимкнена</span>
         <span class="status-text" style="width:100%; opacity:.75;">⚠ для відправки потрібен локальний проксі — запусти start-telegram-proxy.bat і залиш вікно відкритим</span>
       </div>
@@ -2247,6 +2248,33 @@ function applyTgSettings(){
   refreshTgStatusText();
 }
 el('tgSave').addEventListener('click', applyTgSettings);
+
+el('tgTestNotify').addEventListener('click', async () => {
+  const btn = el('tgTestNotify');
+  if(!tgBotToken || !tgPersonalChatId){
+    alert('Спочатку вкажи токен бота і особистий chat_id, і натисни «Зберегти».');
+    return;
+  }
+  const orig = btn.textContent;
+  btn.textContent = 'Відправка…';
+  btn.disabled = true;
+  try{
+    const text = `🆕 Нове замовлення на Prom.ua (ТЕСТ)\n№ 000000000\nТестовий Клієнт\n+380000000000\n999 грн`;
+    const res = await fetch(`${TELEGRAM_PROXY}/bot${tgBotToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: tgPersonalChatId, text })
+    });
+    const json = await res.json().catch(() => null);
+    if(!json || !json.ok) throw new Error((json && json.description) || `HTTP ${res.status}`);
+    notifyQueueReady();
+    btn.textContent = 'Відправлено ✓';
+  }catch(err){
+    alert('Не вдалося відправити тест: ' + err.message);
+  }finally{
+    setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1800);
+  }
+});
 
 async function sendToTelegram(text){
   const url = `${TELEGRAM_PROXY}/bot${tgBotToken}/sendMessage`;
