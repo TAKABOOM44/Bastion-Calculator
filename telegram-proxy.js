@@ -5,9 +5,18 @@
 
 const http = require('http');
 const https = require('https');
+const fs = require('fs');
+const path = require('path');
 
 const PORT = 8788;
 const TELEGRAM_HOST = 'api.telegram.org';
+const LOG_FILE = path.join(__dirname, 'telegram-proxy.log');
+
+function log(line){
+  const stamped = `[${new Date().toISOString()}] ${line}`;
+  console.log(stamped);
+  try{ fs.appendFileSync(LOG_FILE, stamped + '\n'); }catch(e){}
+}
 
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -32,6 +41,10 @@ const server = http.createServer((req, res) => {
   req.on('end', () => {
     const body = Buffer.concat(chunks);
 
+    // Не пишемо в лог сам токен — тільки назву методу (те, що після останнього "/")
+    const methodName = targetPath.split('/').pop();
+    log(`${req.method} ${methodName}`);
+
     const proxyReq = https.request(
       {
         host: TELEGRAM_HOST,
@@ -46,8 +59,15 @@ const server = http.createServer((req, res) => {
         const resChunks = [];
         proxyRes.on('data', (chunk) => resChunks.push(chunk));
         proxyRes.on('end', () => {
+          const resBody = Buffer.concat(resChunks);
+          // Логуємо повну відповідь тільки для getUpdates (там потрібен chat_id) — для інших методів коротко
+          if (methodName === 'getUpdates') {
+            log(`відповідь getUpdates: ${resBody.toString().slice(0, 3000)}`);
+          } else {
+            log(`відповідь ${methodName}: ${proxyRes.statusCode}`);
+          }
           res.writeHead(proxyRes.statusCode, { 'Content-Type': 'application/json' });
-          res.end(Buffer.concat(resChunks));
+          res.end(resBody);
         });
       }
     );
@@ -63,6 +83,6 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Telegram-проксі запущено: http://localhost:${PORT}`);
-  console.log('Залиш це вікно відкритим, поки працюєш із сайтом Диспетчер замовлень.');
+  log(`Telegram-проксі запущено: http://localhost:${PORT}`);
+  log('Залиш це вікно відкритим, поки працюєш із сайтом Диспетчер замовлень.');
 });
