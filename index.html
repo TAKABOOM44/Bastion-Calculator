@@ -1046,7 +1046,10 @@ function buildMessage(){
   if(v('fullname')) lines.push(v('fullname'));
 
   if(state.pay === 'cod'){
-    lines.push(`Наложений платіж ${v('amount') || '—'}`);
+    const rawAmount = v('amount');
+    const numAmount = parseFloat(rawAmount.replace(',', '.'));
+    const formattedAmount = rawAmount && !isNaN(numAmount) ? `${numAmount.toFixed(2)} ₴` : '—';
+    lines.push(`Наложений платіж ${formattedAmount}`);
   } else if(state.pay === 'prepaid'){
     lines.push('Промоплата (100%)');
   }
