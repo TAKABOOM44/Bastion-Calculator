@@ -1453,6 +1453,26 @@ async function fetchPromOrder(){
   }
 }
 
+function parsePromPrice(raw){
+  if(!raw) return '';
+  // Забираємо валюту, літери й пробіли (в т.ч. нерозривні) — лишаємо цифри, кому і крапку
+  let cleaned = String(raw).replace(/[^\d.,]/g, '');
+  if(!cleaned) return '';
+  const lastComma = cleaned.lastIndexOf(',');
+  const lastDot = cleaned.lastIndexOf('.');
+  if(lastComma !== -1 && lastDot !== -1){
+    if(lastComma > lastDot){
+      cleaned = cleaned.replace(/\./g, '').replace(',', '.'); // кома — десятковий роздільник
+    }else{
+      cleaned = cleaned.replace(/,/g, ''); // крапка — десятковий роздільник
+    }
+  }else if(lastComma !== -1){
+    cleaned = cleaned.replace(',', '.'); // тільки кома — вважаємо десятковою
+  }
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? '' : num.toFixed(2);
+}
+
 async function applyPromOrderToForm(order){
   const nameParts = [order.client_last_name, order.client_first_name, order.client_second_name].filter(Boolean);
   if(nameParts.length) el('fullname').value = nameParts.join(' ');
@@ -1484,7 +1504,7 @@ async function applyPromOrderToForm(order){
 
   // Сума — Prom віддає рядок типу "1 469 грн", лишаємо тільки цифри
   if(order.price){
-    const cleanAmount = String(order.price).replace(/[^\d]/g, '');
+    const cleanAmount = parsePromPrice(order.price);
     if(cleanAmount) el('amount').value = cleanAmount;
   }
 
