@@ -1599,7 +1599,7 @@ async function checkTtnStatus(){
   el('ttnStatusText').textContent = 'перевірка…';
   try{
     const phoneDigits = el('phone').value.replace(/\D/g, '');
-    const data = await npCall('InternetDocument', 'getStatusDocuments', { Documents: [{ DocumentNumber: ttn, Phone: phoneDigits }] });
+    const data = await npCall('TrackingDocument', 'getStatusDocuments', { Documents: [{ DocumentNumber: ttn, Phone: phoneDigits }] });
     const doc = data && data[0];
     el('ttnStatusText').textContent = doc ? (doc.StatusDescription || doc.Status || 'статус отримано') : 'ТТН не знайдено';
   }catch(err){
